@@ -10,8 +10,6 @@ local c_stonebrickstair = minetest.get_content_id("stairs:stair_stonebrick")
 local c_gravel = minetest.get_content_id("default:gravel")
 local c_torch_wall = minetest.get_content_id("default:torch_wall")
 
-local dont_replace = {[c_rail] = true, [c_powerrail] = true, [c_wood] = true}
-
 local nameparts = {}
 local file = io.open(minetest.get_modpath(minetest.get_current_modname()).."/nameparts.txt", "r")
 if file then
@@ -155,8 +153,9 @@ local place_every = function(area, iterator, data, data_param2, axis, intermitte
 	end
 end
 
-local modify_slab = function(corner1, corner2, corner3, corner4, area, data, slab_block, bridge_block, seal_water_material, seal_lava_material)
+local modify_slab = function(corner1, corner2, corner3, corner4, area, data, tunnel_def, slab_block, seal_water_material, seal_lava_material)
 	intersectmin, intersectmax = intersect(corner1, corner2, corner3, corner4)
+	local dont_replace = tunnel_def._dont_replace
 	if intersectmin ~= nil then
 		for pi in area:iterp(intersectmin, intersectmax) do
 			if seal_lava_material and data[pi] == c_lava then
@@ -170,10 +169,31 @@ local modify_slab = function(corner1, corner2, corner3, corner4, area, data, sla
 	end
 end
 
--- Draws a horizontal tunnel from pos1 to pos2. "endcap" determines whether the tunnel should have an extra bit added to the end so that turns don't have a jagged corner
-local drawxz = function(pos1, pos2, area, data, data_param2, tunnel_def, endcap)
+-- from_dir leaves the wall on that side open
+local drawcorner = function(pos, area, data, data_param2, tunnel_def, from_dir)
+	local corner1 = vector.new(pos.x - tunnel_def.width, pos.y, pos.z - tunnel_def.width)
+	local corner2 = vector.new(pos.x + tunnel_def.width, pos.y + tunnel_def.height - 1, pos.z + tunnel_def.width)
+	
+	local corner3 = area.MinEdge
+	local corner4 = area.MaxEdge
+	
+	local dont_replace = tunnel_def._dont_replace
+	local intersectmin, intersectmax = intersect(corner1, corner2, corner3, corner4)
+	
+	if intersectmin ~= nil then
+		for pi in area:iterp(intersectmin, intersectmax) do
+			if not dont_replace[data[pi]] then
+				data[pi] = c_air
+			end
+		end		
+	end
+end
+
+-- Draws a horizontal tunnel from pos1 to pos2.
+local drawxz = function(pos1, pos2, area, data, data_param2, tunnel_def)
 	local displace = tunnel_def.width
 	local height = tunnel_def.height
+	local dont_replace = tunnel_def._dont_replace
 
 	local corner1 = {x = math.min(pos1.x, pos2.x), y = pos1.y, z = math.min(pos1.z, pos2.z)}
 	local corner2 = {x = math.max(pos1.x, pos2.x), y = pos1.y, z = math.max(pos1.z, pos2.z)}
@@ -194,7 +214,6 @@ local drawxz = function(pos1, pos2, area, data, data_param2, tunnel_def, endcap)
 	end
 	corner1[width_axis] = corner1[width_axis] - displace
 	corner2[width_axis] = corner2[width_axis] + displace
-
 
 	local corner3 = area.MinEdge
 	local corner4 = area.MaxEdge
@@ -225,9 +244,11 @@ local drawxz = function(pos1, pos2, area, data, data_param2, tunnel_def, endcap)
 		local liquid_block = tunnel_def.liquid_block
 		
 		-- If there's a trench block defined, put it on the sides of the tunnel
-		if trench_block and displace > 0 then
+		if trench_block and displace > 0 and corner2[length_axis]-corner1[length_axis] > displace*2 then
 			local trenchside1 = vector.new(path1)
 			local trenchside2 = vector.new(path2)
+			trenchside1[length_axis] = trenchside1[length_axis]+displace -- to ensure trench walls don't overlap in corners
+			trenchside2[length_axis] = trenchside2[length_axis]-displace
 			trenchside1[width_axis] = trenchside1[width_axis]-displace
 			trenchside2[width_axis] = trenchside2[width_axis]-displace
 			intersectmin, intersectmax = intersect(trenchside1, trenchside2, corner3, corner4)
@@ -281,9 +302,12 @@ local drawxz = function(pos1, pos2, area, data, data_param2, tunnel_def, endcap)
 	if floor_block or seal_lava_material or seal_water_material then
 		local floor1 = vector.new(path1.x, path1.y-1, path1.z)
 		local floor2 = vector.new(path2.x, path2.y-1, path2.z)
-		floor1[width_axis] = floor1[width_axis] - (displace+1)
-		floor2[width_axis] = floor2[width_axis] + (displace+1)
-		modify_slab(floor1, floor2, corner3, corner4, area, data, floor_block, bridge_block, seal_water_material, seal_lava_material)
+		floor1[width_axis] = floor1[width_axis] - (displace)
+		floor2[width_axis] = floor2[width_axis] + (displace)
+
+		if bridge_block then dont_replace[bridge_block] = true end
+		modify_slab(floor1, floor2, corner3, corner4, area, data, tunnel_def, floor_block, seal_water_material, seal_lava_material)
+		if bridge_block then dont_replace[bridge_block] = false end
 	end
 	if bridge_block then
 		local bridge1 = vector.new(path1.x, path1.y-1, path1.z)
@@ -303,9 +327,9 @@ local drawxz = function(pos1, pos2, area, data, data_param2, tunnel_def, endcap)
 	if ceiling_block or seal_lava_material or seal_water_material then
 		local ceiling1 = vector.new(path1.x, path1.y+height, path1.z)
 		local ceiling2 = vector.new(path2.x, path2.y+height, path2.z)
-		ceiling1[width_axis] = ceiling1[width_axis] - (displace+1)
-		ceiling2[width_axis] = ceiling2[width_axis] + (displace+1)
-		modify_slab(ceiling1, ceiling2, corner3, corner4, area, data, ceiling_block, bridge_block, seal_water_material, seal_lava_material)
+		ceiling1[width_axis] = ceiling1[width_axis] - (displace)
+		ceiling2[width_axis] = ceiling2[width_axis] + (displace)
+		modify_slab(ceiling1, ceiling2, corner3, corner4, area, data, tunnel_def, ceiling_block, seal_water_material, seal_lava_material)
 	end
 
 	if wall_block or seal_lava_material or seal_water_material then
@@ -313,10 +337,10 @@ local drawxz = function(pos1, pos2, area, data, data_param2, tunnel_def, endcap)
 		local wall2 = vector.new(path2.x, path2.y+height-1, path2.z)
 		wall1[width_axis] = wall1[width_axis] - (displace+1)
 		wall2[width_axis] = wall2[width_axis] - (displace+1)
-		modify_slab(wall1, wall2, corner3, corner4, area, data, wall_block, bridge_block, seal_water_material, seal_lava_material)
+		modify_slab(wall1, wall2, corner3, corner4, area, data, tunnel_def, wall_block, seal_water_material, seal_lava_material)
 		wall1[width_axis] = wall1[width_axis] + 2*displace+2
 		wall2[width_axis] = wall2[width_axis] + 2*displace+2
-		modify_slab(wall1, wall2, corner3, corner4, area, data, wall_block, bridge_block, seal_water_material, seal_lava_material)
+		modify_slab(wall1, wall2, corner3, corner4, area, data, tunnel_def, wall_block, seal_water_material, seal_lava_material)
 	end
 end
 
@@ -334,6 +358,7 @@ local drawy = function(pos1, pos2, area, data, data_param2, tunnel_def)
 	local displace = tunnel_def.width
 	local height = tunnel_def.height
 	local add_rail = tunnel_def.rail
+	local dont_replace = tunnel_def._dont_replace
 	
 	local length_axis
 	local width_axis
@@ -448,18 +473,20 @@ draw_tunnel_segment = function(source, destination, area, data, data_param2, tun
 	else
 		change_x = math.random() > 0.5
 	end
-
+	
 	local next_location
 
 	--we may need to jink to the side to avoid retracing previous steps
 	if prev_dir then
 		if change_x and ((prev_dir.x < 0 and dir_x > 0) or (prev_dir.x > 0 and dir_x < 0)) then
 			next_location = vector.new(source.x, source.y, source.z + (width*2+2)*random_sign())
-			drawxz(source, next_location, area, data, data_param2, tunnel_def, true)
+			drawxz(source, next_location, area, data, data_param2, tunnel_def)
+			if not vector.equals(destination, next_location) then drawcorner(next_location, area, data, data_param2, tunnel_def) end
 			source = vector.new(next_location)
 		elseif (not change_x) and ((prev_dir.z < 0 and dir_z > 0) or (prev_dir.z > 0 and dir_z < 0)) then
 			next_location = vector.new(source.x + (width*2+2)*random_sign(), source.y, source.z)
-			drawxz(source, next_location, area, data, data_param2, tunnel_def, true)
+			drawxz(source, next_location, area, data, data_param2, tunnel_def)
+			if not vector.equals(destination, next_location) then drawcorner(next_location, area, data, data_param2, tunnel_def) end
 			source = vector.new(next_location)
 		end
 	end
@@ -468,19 +495,21 @@ draw_tunnel_segment = function(source, destination, area, data, data_param2, tun
 		if change_x then
 			local dist = math.min(math.random(10, 1000), math.abs(diff.x)) * dir_x
 			next_location = vector.new(source.x+dist, source.y, source.z)
-			drawxz(source, next_location, area, data, data_param2, tunnel_def, true)
+			drawxz(source, next_location, area, data, data_param2, tunnel_def)
 		else
 			local dist = math.min(math.random(10, 1000), math.abs(diff.z)) * dir_z
 			next_location = vector.new(source.x, source.y, source.z+dist)
-			drawxz(source, next_location, area, data, data_param2, tunnel_def, true)
+			drawxz(source, next_location, area, data, data_param2, tunnel_def)
 		end
+		if not vector.equals(destination, next_location) then drawcorner(next_location, area, data, data_param2, tunnel_def) end
 	else
 		local slope = tunnel_def.slope
 		if change_x then
 			if prev_dir and not ((prev_dir.x > 0 and dir_x > 0) or (prev_dir.x < 0 and dir_x < 0)) then
-				-- if we're changing direction first go width nodes in this direction to make the corner nicer. Don't add an endcap, that will interfere with the sloped part.
+				-- if we're changing direction first go width nodes in this direction to make the corner nicer.
 				next_location = vector.new(source.x + width*dir_x, source.y, source.z)
-				drawxz(source, next_location, area, data, data_param2, tunnel_def)
+				--drawxz(source, next_location, area, data, data_param2, tunnel_def)
+				if not vector.equals(destination, next_location) then drawcorner(next_location, area, data, data_param2, tunnel_def) end
 				source = vector.new(next_location)
 			end
 			-- then do the sloped part
@@ -490,12 +519,14 @@ draw_tunnel_segment = function(source, destination, area, data, data_param2, tun
 			source = vector.new(next_location)
 			-- then the last bit to make the bottom nicer
 			next_location = vector.new(source.x + width*dir_x, source.y, source.z)
-			drawxz(source, next_location, area, data, data_param2, tunnel_def)
+			--drawxz(source, next_location, area, data, data_param2, tunnel_def)
+			if not vector.equals(destination, next_location) then drawcorner(next_location, area, data, data_param2, tunnel_def) end
 		else
 			if prev_dir and not ((prev_dir.z > 0 and dir_z > 0) or (prev_dir.z < 0 and dir_z < 0)) then
 				-- if we're changing direction first go width nodes in this direction to make the corner nicer
 				next_location = vector.new(source.x, source.y, source.z + width*dir_z)
-				drawxz(source, next_location, area, data, data_param2, tunnel_def)
+				--drawxz(source, next_location, area, data, data_param2, tunnel_def)
+				if not vector.equals(destination, next_location) then drawcorner(next_location, area, data, data_param2, tunnel_def) end
 				source = vector.new(next_location)
 			end
 			-- then do the sloped part
@@ -505,7 +536,8 @@ draw_tunnel_segment = function(source, destination, area, data, data_param2, tun
 			source = vector.new(next_location)
 			-- then the last bit to make the bottom nicer
 			next_location = vector.new(source.x, source.y, source.z + width*dir_z)
-			drawxz(source, next_location, area, data, data_param2, tunnel_def)
+			--drawxz(source, next_location, area, data, data_param2, tunnel_def)
+			if not vector.equals(destination, next_location) then drawcorner(next_location, area, data, data_param2, tunnel_def) end
 		end
 	end
 	prev_dir = vector.subtract(next_location, source)
@@ -536,6 +568,7 @@ local default_tunnel_def =
 	width = 1, -- note: this is the number of blocks added on either side of the center block. So width 1 gives a tunnel 3 blocks wide, width 2 gives a tunnel 5 blocks wide, etc.
 	height = 3,
 	arch_spacing = nil, -- when 1, continuous arch. When 0 or nil, no arch.
+	_dont_replace = {[c_rail] = true, [c_powerrail] = true} -- Don't set this explicitly.
 }
 
 local set_defaults = function(defaults, target)
