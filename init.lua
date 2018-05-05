@@ -59,8 +59,8 @@ minetest.register_on_generated(function(minp, maxp, seed)
 		seal_lava_material = c_stonebrick,
 		seal_water_material = c_glass,
 		
-		wall_block = c_stonebrick,
-		ceiling_block = c_stonebrick,
+		--wall_block = c_stonebrick,
+		--ceiling_block = c_stonebrick,
 		
 		torch_spacing = 8,
 		torch_height = 2,

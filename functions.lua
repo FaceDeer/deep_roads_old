@@ -24,7 +24,9 @@ deep_roads.Context = {}
 -- Grid stuff
 --------------------------------------------------
 
-local scatter_3d = function(min_xyz, gridscale_xyz, min_output_size, max_output_size)
+function deep_roads.Context:scatter_3d(min_xyz, min_output_size, max_output_size)
+	local gridscale_xyz = self.gridscale
+
 	local next_seed = math.random(1, 1000000000)
 	math.randomseed(min_xyz.x + min_xyz.z * 2 ^ 8 + min_xyz.y * 2 ^ 16)
 	local count = math.random(min_output_size, max_output_size)
@@ -44,14 +46,24 @@ local scatter_3d = function(min_xyz, gridscale_xyz, min_output_size, max_output_
 end
 
 
-local get_grid_and_adjacent = function(min_xyz, gridscale_xyz, min_output_size, max_output_size, min_y, max_y)
+function deep_roads.Context:road_points_around(min_output_size, max_output_size)
+	local pos = self.chunk_min
+	local gridscale_xyz = self.gridscale
+	local min_y = self.ymin
+	local max_y = self.ymax
+	
+	local min_xyz = {
+		x = math.floor(pos.x / gridscale_xyz.x),
+		y = math.floor(pos.y / gridscale_xyz.y),
+		z = math.floor(pos.z / gridscale_xyz.z)}
+
 	local result = {}
 	
 	for x_grid = -1, 1 do
 		for y_grid = -1, 1 do
 			for z_grid = -1, 1 do
 				local grid = vector.multiply(gridscale_xyz, vector.add(min_xyz, {x=x_grid, y=y_grid, z=z_grid}))
-				for _, point in pairs(scatter_3d(grid, gridscale_xyz, min_output_size, max_output_size)) do
+				for _, point in pairs(self:scatter_3d(grid, min_output_size, max_output_size)) do
 					if (point.y >= min_y and point.y <= max_y) then
 						table.insert(result, point)
 					end
@@ -60,15 +72,7 @@ local get_grid_and_adjacent = function(min_xyz, gridscale_xyz, min_output_size, 
 		end
 	end
 	
-	return result
-end
-
-local road_points_around = function(pos, gridscale_xyz, min_y, max_y)
-	local corner = {
-		x = math.floor(pos.x / gridscale_xyz.x),
-		y = math.floor(pos.y / gridscale_xyz.y),
-		z = math.floor(pos.z / gridscale_xyz.z)}
-	return get_grid_and_adjacent(corner, gridscale_xyz, 1, 4, min_y, max_y)
+	self.points = result
 end
 
 -- Connection stuff
@@ -85,7 +89,9 @@ local jitter_point = function(jitter, point)
 			val = point.val}
 end
 
-local find_connections = function(points, gridscale, odds)
+function deep_roads.Context:find_connections(odds)
+	local points = self.points
+	local gridscale = self.gridscale
 	local connections = {}
 	-- Do a triangular array comparison, ensuring that each pair is tested only once.
 	for index1 = 1, table.getn(points) do
@@ -112,12 +118,12 @@ local find_connections = function(points, gridscale, odds)
 			end
 		end
 	end
-	return connections
+	self.connections = connections
 end
 
 --------------------------------------------------------------------
 
-function deep_roads.Context:new(minp, maxp, area, data, data_param2, gridscale, ymin, ymax, connection_probability)
+function deep_roads.Context:new(minp, maxp, area, data, data_param2, gridscale, ymin, ymax, seed, connection_probability)
 	context = {}
 	setmetatable(context, self)
 	self.__index = self
@@ -130,9 +136,10 @@ function deep_roads.Context:new(minp, maxp, area, data, data_param2, gridscale, 
 	context.gridscale = gridscale
 	context.ymin = ymin
 	context.ymax = ymax
+	context.seed = seed
 	
-	context.points = road_points_around(minp, gridscale, ymin, ymax)
-	context.connections = find_connections(context.points, gridscale, connection_probability)
+	context:road_points_around(1,4)
+	context:find_connections(connection_probability)
 
 	
 	return context
@@ -200,13 +207,15 @@ function deep_roads.Context:modify_slab(corner1, corner2, tunnel_def, slab_block
 	if intersectmin ~= nil then
 		for pi in self.area:iterp(intersectmin, intersectmax) do
 			if not locked_indices[pi] then
-				if seal_air_material and data[pi] == c_air then
+				local current_material = data[pi]
+			
+				if seal_air_material and current_material == c_air then
 					data[pi] = seal_air_material
-				elseif seal_lava_material and data[pi] == c_lava then
+				elseif seal_lava_material and current_material == c_lava then
 					data[pi] = seal_lava_material
-				elseif seal_water_material and data[pi] == c_water then
+				elseif seal_water_material and current_material == c_water then
 					data[pi] = seal_water_material
-				elseif data[pi] ~= c_air then
+				elseif current_material ~= c_air and current_material ~= c_lava and current_material ~= c_water then
 					data[pi] = slab_block
 				end
 			end
@@ -366,6 +375,23 @@ function deep_roads.Context:drawxz(pos1, pos2, tunnel_def)
 	local ceiling_block = tunnel_def.ceiling_block
 	local wall_block = tunnel_def.wall_block
 	
+	if bridge_block then
+		local bridge1 = vector.new(path1.x, path1.y-1, path1.z)
+		local bridge2 = vector.new(path2.x, path2.y-1, path2.z)
+		bridge1[width_axis] = bridge1[width_axis] - tunnel_def.bridge_width
+		bridge2[width_axis] = bridge2[width_axis] + tunnel_def.bridge_width
+		intersectmin, intersectmax = intersect(bridge1, bridge2, self.chunk_min, self.chunk_max)
+		if intersectmin ~= nil then
+			for pi in area:iterp(intersectmin, intersectmax) do
+				local current_material = data[pi]
+				if current_material == c_air or current_material == c_water or current_material == c_lava then
+					data[pi] = bridge_block
+					locked_indices[pi] = true
+				end
+			end
+		end
+	end
+	
 	--walls, floor, ceiling modifications
 	if floor_block or seal_lava_material or seal_water_material then
 		local floor1 = vector.new(path1.x, path1.y-1, path1.z)
@@ -375,23 +401,7 @@ function deep_roads.Context:drawxz(pos1, pos2, tunnel_def)
 
 		self:modify_slab(floor1, floor2, tunnel_def, floor_block, nil, seal_water_material, seal_lava_material)
 	end
-	if bridge_block then
-		local bridge1 = vector.new(path1.x, path1.y-1, path1.z)
-		local bridge2 = vector.new(path2.x, path2.y-1, path2.z)
-		bridge1[width_axis] = bridge1[width_axis] - tunnel_def.bridge_width
-		bridge2[width_axis] = bridge2[width_axis] + tunnel_def.bridge_width
-		intersectmin, intersectmax = intersect(bridge1, bridge2, self.chunk_min, self.chunk_max)
-		if intersectmin ~= nil then
-			for pi in area:iterp(intersectmin, intersectmax) do
-				if data[pi] == c_air then
-					data[pi] = bridge_block
-					locked_indices[pi] = true
-				end
-			end
-		end
-	end
-	
-	if ceiling_block or seal_lava_material or seal_water_material then
+	if ceiling_block or seal_lava_material or seal_water_material or seal_air_material then
 		local ceiling1 = vector.new(path1.x, path1.y+height, path1.z)
 		local ceiling2 = vector.new(path2.x, path2.y+height, path2.z)
 		ceiling1[width_axis] = ceiling1[width_axis] - (displace)
@@ -399,7 +409,7 @@ function deep_roads.Context:drawxz(pos1, pos2, tunnel_def)
 		self:modify_slab(ceiling1, ceiling2, tunnel_def, ceiling_block, seal_air_material, seal_water_material, seal_lava_material)
 	end
 
-	if wall_block or seal_lava_material or seal_water_material then
+	if wall_block or seal_lava_material or seal_water_material or seal_air_material then
 		local wall1 = vector.new(path1.x, path1.y, path1.z)
 		local wall2 = vector.new(path2.x, path2.y+height-1, path2.z)
 		wall1[width_axis] = wall1[width_axis] - (displace+1)
