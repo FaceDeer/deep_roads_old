@@ -44,7 +44,7 @@ minetest.register_on_generated(function(minp, maxp, seed)
 	vm:get_data(data)
 	vm:get_param2_data(data_param2)
 
-	local context = deep_roads.Context:new(minp, maxp, area, data, data_param2, gridscale, ymin, ymax, seed, connection_probability)
+	local context = deep_roads.Context:new(minp, maxp, area, data, data_param2, gridscale, ymin, ymax, connection_probability)
 	
 	for _, pt in ipairs(context.points) do
 		--minetest.debug(minetest.pos_to_string(pt) .. " named " .. deep_roads.random_name(pt.val))

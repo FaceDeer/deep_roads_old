@@ -26,9 +26,9 @@ deep_roads.Context = {}
 
 function deep_roads.Context:scatter_3d(min_xyz, min_output_size, max_output_size)
 	local gridscale_xyz = self.gridscale
-
+	
 	local next_seed = math.random(1, 1000000000)
-	math.randomseed(min_xyz.x + min_xyz.z * 2 ^ 8 + min_xyz.y * 2 ^ 16)
+	math.randomseed(min_xyz.x + min_xyz.z * 2 ^ 8 + min_xyz.y * 2 ^ 16 + self.seed)
 	local count = math.random(min_output_size, max_output_size)
 	local result = {}
 	while count > 0 do
@@ -123,7 +123,7 @@ end
 
 --------------------------------------------------------------------
 
-function deep_roads.Context:new(minp, maxp, area, data, data_param2, gridscale, ymin, ymax, seed, connection_probability)
+function deep_roads.Context:new(minp, maxp, area, data, data_param2, gridscale, ymin, ymax, connection_probability)
 	context = {}
 	setmetatable(context, self)
 	self.__index = self
@@ -136,7 +136,7 @@ function deep_roads.Context:new(minp, maxp, area, data, data_param2, gridscale, 
 	context.gridscale = gridscale
 	context.ymin = ymin
 	context.ymax = ymax
-	context.seed = seed
+	context.seed = tonumber(minetest.get_mapgen_setting("seed"))
 	
 	context:road_points_around(1,4)
 	context:find_connections(connection_probability)
