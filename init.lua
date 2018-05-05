@@ -10,6 +10,12 @@ local gridscale = {x=1000, y=200, z=1000}
 local data = {}
 local data_param2 = {}
 
+local c_wood = minetest.get_content_id("default:wood")
+local c_stone = minetest.get_content_id("default:stone")
+local c_stonebrick = minetest.get_content_id("default:stonebrick")
+local c_stonebrickstair = minetest.get_content_id("stairs:stair_stonebrick")
+local c_gravel = minetest.get_content_id("default:gravel")
+
 -- On generated function
 minetest.register_on_generated(function(minp, maxp, seed)
 
@@ -34,19 +40,50 @@ minetest.register_on_generated(function(minp, maxp, seed)
 	vm:get_data(data)
 	vm:get_param2_data(data_param2)
 
+	local context = deep_roads.Context:new(minp, maxp, area, data, data_param2)
 	
 	local points = deep_roads.road_points_around(minp, gridscale, -2000, -10)
 	
 	for _, pt in ipairs(points) do
 		--minetest.debug(minetest.pos_to_string(pt) .. " named " .. deep_roads.random_name(pt.val))
-		deep_roads.carve_intersection(pt, 8, area, data)
+		context:carve_intersection(pt, 8)
 	end
 	
 	local connections = deep_roads.find_connections(points, gridscale, 0.75)
 
+	local tunnel_def = 
+	{
+		rail = true,-- math.random() < 0.75,
+		powered_rail = true,
+		bridge_block = c_wood,
+		seal_lava_material = c_stonebrick,
+		
+		wall_block = c_stonebrick,
+		ceiling_block = c_stonebrick,
+		
+		torch_spacing = 8,
+		torch_height = 2,
+	}
+	local narrow_tunnel = 
+	{
+		width=0,
+		height=2,
+		bridge_block = c_wood,
+	}
+	local sewer_def =
+	{
+		trench_block = c_stonebrick,
+		floor_block = c_stonebrick,
+		liquid_block = c_water,
+		bridge_block = c_stonebrick,
+		bridge_width = 1,
+	}
+
+	
+	
 	for _, conn in ipairs(connections) do
 		--minetest.debug(deep_roads.random_name(conn.pt1.val) .. " connected to " .. deep_roads.random_name(conn.pt2.val) .. " with val " .. tostring(conn.val))
-		deep_roads.segmentize_connection(conn, area, data, data_param2)
+		context:segmentize_connection(conn, tunnel_def)
 	end
 	
 	--mandatory values
