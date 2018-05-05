@@ -7,7 +7,7 @@ dofile(modpath.."/functions.lua") --function definitions
 
 local gridscale = {x=1000, y=200, z=1000}
 local ymin = -2000
-local ymax = 10
+local ymax = -10
 local connection_probability = 0.75
 
 local data = {}
@@ -21,11 +21,52 @@ local c_stonebrickstair = minetest.get_content_id("stairs:stair_stonebrick")
 local c_gravel = minetest.get_content_id("default:gravel")
 local c_glass = minetest.get_content_id("default:glass")
 
+
+local tunnel_def = 
+{
+	rail = true,-- math.random() < 0.75,
+	powered_rail = true,
+	bridge_block = c_wood,
+	seal_lava_material = c_stonebrick,
+	seal_water_material = c_glass,
+	
+	--wall_block = c_stonebrick,
+	--ceiling_block = c_stonebrick,
+	
+	torch_spacing = 8,
+	torch_height = 2,
+	--width = 2,
+	--height = 4,
+	
+}
+local narrow_tunnel = 
+{
+	width=0,
+	height=2,
+	bridge_block = c_wood,
+}
+local sewer_def =
+{
+	trench_block = c_stonebrick,
+	floor_block = c_stonebrick,
+	liquid_block = c_water,
+	bridge_block = c_stonebrick,
+	bridge_width = 1,
+	torch_spacing = 16,
+	torch_height = 3,
+}
+
+local intersection_def =
+{
+	min_radius = 8,
+	max_radius = 16,
+}
+
 -- On generated function
 minetest.register_on_generated(function(minp, maxp, seed)
 
 	--if out of range of cave definition limits, abort
---	if minp.y > YMAX or maxp.y < YMIN then
+--	if minp.y > ymax or maxp.y < ymin then
 --		return
 --	end
 	
@@ -45,50 +86,16 @@ minetest.register_on_generated(function(minp, maxp, seed)
 	vm:get_data(data)
 	vm:get_param2_data(data_param2)
 
-	local context = deep_roads.Context:new(minp, maxp, area, data, data_param2, gridscale, ymin, ymax, connection_probability)
+	local context = deep_roads.Context:new(minp, maxp, area, data, data_param2, gridscale, ymin, ymax, intersection_def, tunnel_def, connection_probability)
 	
 	for _, pt in ipairs(context.points) do
 		--minetest.debug(minetest.pos_to_string(pt) .. " named " .. deep_roads.random_name(pt.val))
-		context:carve_intersection(pt, 8)
+		context:carve_intersection(pt)
 	end
-	
-	local tunnel_def = 
-	{
-		rail = true,-- math.random() < 0.75,
-		powered_rail = true,
-		bridge_block = c_wood,
-		seal_lava_material = c_stonebrick,
-		seal_water_material = c_glass,
-		
-		--wall_block = c_stonebrick,
-		--ceiling_block = c_stonebrick,
-		
-		torch_spacing = 8,
-		torch_height = 2,
-		--width = 2,
-		--height = 4,
-		
-	}
-	local narrow_tunnel = 
-	{
-		width=0,
-		height=2,
-		bridge_block = c_wood,
-	}
-	local sewer_def =
-	{
-		trench_block = c_stonebrick,
-		floor_block = c_stonebrick,
-		liquid_block = c_water,
-		bridge_block = c_stonebrick,
-		bridge_width = 1,
-	}
-
-	
 	
 	for _, conn in ipairs(context.connections) do
 		--minetest.debug(deep_roads.random_name(conn.pt1.val) .. " connected to " .. deep_roads.random_name(conn.pt2.val) .. " with val " .. tostring(conn.val))
-		context:segmentize_connection(conn, tunnel_def)
+		context:segmentize_connection(conn)
 	end
 	
 	--mandatory values

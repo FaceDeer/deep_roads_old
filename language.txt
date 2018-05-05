@@ -215,6 +215,7 @@ brilliant
 brim
 bristle
 broil
+broken
 bronze
 brook
 brother
@@ -311,6 +312,7 @@ chestnut
 chew
 child
 chill
+chimney
 chip
 chirp
 chocolate
@@ -343,7 +345,9 @@ cleanse
 clear
 clearing
 cleave
+cleft
 clench
+cleric
 climate
 climax
 clinch
@@ -429,6 +433,7 @@ cover
 cow
 crab
 crack
+cracked
 cradle
 craft
 crater
@@ -449,6 +454,7 @@ crevice
 crew
 crimson
 critter
+croft
 cross
 crow
 crowd
@@ -611,7 +617,7 @@ dungeon
 dusk
 dust
 duty
-dwarf]
+dwarf
 dwell
 dwelling
 dwindle
@@ -631,6 +637,7 @@ egg
 elbow
 elder
 elevate
+elf
 emancipate
 embrace
 emerald
@@ -676,6 +683,7 @@ fade
 fail
 faint
 fair
+fairy
 faith
 fall
 false
@@ -711,6 +719,7 @@ field
 fiend
 fierce
 fight
+fighter
 figure
 filth
 fin
@@ -839,6 +848,7 @@ glow
 glum
 glutton
 gnarled
+gnome
 goad
 goal
 goat
@@ -847,6 +857,7 @@ god
 godforsaken
 gold
 goldenrod
+golem
 goo
 good
 goose
@@ -905,6 +916,7 @@ hail
 hair
 hairy
 hale
+halfling
 hall
 hame
 hammer
@@ -983,6 +995,7 @@ howl
 hug
 huge
 hum
+human
 humble
 humid
 humor
@@ -1003,6 +1016,7 @@ immoral
 immorality
 immortal
 immortality
+imp
 impale
 impervious
 imprison
@@ -1065,6 +1079,7 @@ keg
 kelp
 key
 kidney
+kill
 killer
 kin
 kindle
@@ -1092,10 +1107,8 @@ lance
 lancer
 land
 language
-language]
 languish
 lantern
-lapislazuli
 lard
 large
 lark
@@ -1182,6 +1195,7 @@ lute
 luxury
 lyric
 machine
+madness
 magenta
 maggot
 magic
@@ -1441,6 +1455,7 @@ pink
 pinnacle
 pit
 pitch
+pixie
 place
 plague
 plain
@@ -1673,6 +1688,7 @@ scorn
 scorpion
 scour
 scourge
+scout
 scrap
 scrape
 scratch
@@ -1771,6 +1787,7 @@ skunk
 sky
 slander
 slap
+slash
 slaughter
 slave
 slayer
@@ -1865,6 +1882,7 @@ spray
 spread
 spring
 sprinkle
+sprite
 spry
 spurn
 spurt
@@ -2247,6 +2265,7 @@ wish
 wisp
 witch
 wither
+wizard
 wolf
 woman
 wonder

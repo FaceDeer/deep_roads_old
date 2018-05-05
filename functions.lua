@@ -20,8 +20,32 @@ else
 	nameparts = {"Unable to read " .. nameparts_filename}
 end
 
-deep_roads.Context = {}
-
+local default_tunnel_def = 
+{
+	rail = false, -- places a single rail line down the center of the tunnel.
+	powered_rail = false, -- if true, powered rail nodes will be placed at intervals to keep the carts moving
+	liquid_block = nil, -- if set to a block, then instead of rails will fill the lowest level of the tunnel with this fluid.
+	trench_block = nil, -- when non-nil, puts blocks along the base of the walls to make a depressed trench in the center of the tunnel. Useful for sewers, subways
+	torch_spacing = nil, -- nil means no torches
+	torch_height = 1,
+	torch_probability = 1, -- allows for erratic torch spacing
+	torch_arrangement = "1 wall", -- "1 wall" puts torches on one wall, "2 wall pairs" puts them on both walls at the same place, "2 wall alternating" puts them on alternating walls, "ceiling" puts them on the ceiling.
+	sign_spacing = nil, -- nil means no signs
+	sign_probability = 1, -- allows for erratic sign spacing
+	bridge_block = nil, -- if not nil, replaces air in floor
+	bridge_width = 0, -- width of bridge (same meaning as "width", so width of 1 gives a bridge 3 wide, and so forth)
+	stair_block = nil, -- also used for arches
+	floor_block = nil, -- when non-nil, replaces floor with this block type. Does not bridge air gaps.
+	wall_block = nil, -- when non-nil, replaces walls with this block type
+	ceiling_block = nil, -- when non-nil, replaces ceiling with this block type
+	slope = 2,
+	seal_lava_material = nil, -- replace lava blocks in walls with this material
+	seal_water_material = nil, -- replace water blocks in walls with this material
+	seal_air_material = nil, -- patch holes in walls and ceilings with this material. Use bridge material for patching floors.
+	width = 1, -- note: this is the number of blocks added on either side of the center block. So width 1 gives a tunnel 3 blocks wide, width 2 gives a tunnel 5 blocks wide, etc.
+	height = 3,
+	arch_spacing = nil, -- when 1, continuous arch. When 0 or nil, no arch.
+}
 
 local simple_copy = function(t)
 	local r = {}
@@ -30,6 +54,9 @@ local simple_copy = function(t)
 	end
 	return r
 end
+
+deep_roads.Context = {}
+
 
 -- Grid stuff
 --------------------------------------------------
@@ -56,7 +83,7 @@ function deep_roads.Context:scatter_3d(min_xyz, min_output_size, max_output_size
 end
 
 
-function deep_roads.Context:road_points_around(min_output_size, max_output_size)
+function deep_roads.Context:road_points_around(min_output_size, max_output_size, intersection_def)
 	local pos = self.chunk_min
 	local gridscale_xyz = self.gridscale
 	local min_y = self.ymin
@@ -75,6 +102,7 @@ function deep_roads.Context:road_points_around(min_output_size, max_output_size)
 				local grid = vector.multiply(gridscale_xyz, vector.add(min_xyz, {x=x_grid, y=y_grid, z=z_grid}))
 				for _, point in pairs(self:scatter_3d(grid, min_output_size, max_output_size)) do
 					if (point.y >= min_y and point.y <= max_y) then
+						point.def = intersection_def
 						table.insert(result, point)
 					end
 				end
@@ -88,9 +116,7 @@ end
 -- Connection stuff
 ------------------------------------------------------
 
-local endpoint_displace = 8
-
-function deep_roads.Context:find_connections(odds)
+function deep_roads.Context:find_connections(odds, tunnel_def)
 	local points = self.points
 	local gridscale = self.gridscale
 	local connections = {}
@@ -105,19 +131,20 @@ function deep_roads.Context:find_connections(odds)
 				if combined < odds then
 					local connection_val = combined/odds
 					local dir = vector.direction(point1, point2)
-					dir.x = math.ceil(dir.x * endpoint_displace)
-					dir.z = math.ceil(dir.z * endpoint_displace)
 					
-					point1.x = point1.x + dir.x
-					point1.z = point1.z + dir.z
+					local radius1 = math.floor(point1.val*(point1.def.max_radius-point1.def.min_radius)+ point1.def.min_radius)+2
+					local radius2 = math.floor(point2.val*(point2.def.max_radius-point2.def.min_radius)+ point2.def.min_radius)+2
+										
+					point1.x = point1.x + math.ceil(dir.x * radius1)
+					point1.z = point1.z + math.ceil(dir.z * radius1)
 					
-					point2.x = point2.x - dir.x
-					point2.z = point2.z - dir.z
+					point2.x = point2.x + math.ceil(dir.x * radius2)
+					point2.z = point2.z + math.ceil(dir.z * radius2)
 
 					if point1.x + point1.y + point1.z > point2.x + point2.y + point2.z then -- always sort each pair of points the same way.
-						table.insert(connections, {pt1 = point1, pt2 = point2, val = connection_val})
+						table.insert(connections, {pt1 = point1, pt2 = point2, val = connection_val, def=tunnel_def})
 					else
-						table.insert(connections, {pt1 = point2, pt2 = point1, val = connection_val})
+						table.insert(connections, {pt1 = point2, pt2 = point1, val = connection_val, def=tunnel_def})
 					end
 				end
 			end
@@ -128,7 +155,18 @@ end
 
 --------------------------------------------------------------------
 
-function deep_roads.Context:new(minp, maxp, area, data, data_param2, gridscale, ymin, ymax, connection_probability)
+local set_defaults = function(defaults, target)
+	for k, v in pairs(defaults) do
+		if target[k] == nil then
+			target[k] = v
+		end
+	end
+end
+
+function deep_roads.Context:new(minp, maxp, area, data, data_param2, gridscale, ymin, ymax, intersection_def, connection_def, connection_probability)
+
+	set_defaults(default_tunnel_def, connection_def)
+
 	local context = {}
 	setmetatable(context, self)
 	self.__index = self
@@ -143,8 +181,8 @@ function deep_roads.Context:new(minp, maxp, area, data, data_param2, gridscale, 
 	context.ymax = ymax
 	context.seed = tonumber(minetest.get_mapgen_setting("seed"))
 	
-	context:road_points_around(1,4)
-	context:find_connections(connection_probability)
+	context:road_points_around(1,4, intersection_def)
+	context:find_connections(connection_probability, connection_def)
 
 	
 	return context
@@ -520,7 +558,10 @@ function deep_roads.Context:drawy(pos1, pos2, tunnel_def)
 	end
 end
 
-function deep_roads.Context:carve_intersection(point, radius)
+function deep_roads.Context:carve_intersection(point)
+
+	local radius = math.floor(point.val*(point.def.max_radius-point.def.min_radius)+ point.def.min_radius)
+	
 	local corner1 = {x=point.x - radius, y= point.y, z=point.z - radius}
 	local corner2 = {x=point.x + radius, y= point.y+3, z=point.z + radius}
 	local chunk_min = self.chunk_min
@@ -641,53 +682,14 @@ function deep_roads.Context:draw_tunnel_segment(source, destination, tunnel_def,
 	self:draw_tunnel_segment(next_location, destination, tunnel_def, prev_dir)
 end
 
-
-local default_tunnel_def = 
-{
-	rail = false, -- places a single rail line down the center of the tunnel.
-	powered_rail = false, -- if true, powered rail nodes will be placed at intervals to keep the carts moving
-	liquid_block = nil, -- if set to a block, then instead of rails will fill the lowest level of the tunnel with this fluid.
-	trench_block = nil, -- when non-nil, puts blocks along the base of the walls to make a depressed trench in the center of the tunnel. Useful for sewers, subways
-	torch_spacing = nil, -- nil means no torches
-	torch_height = 1,
-	torch_probability = 1, -- allows for erratic torch spacing
-	torch_arrangement = "1 wall", -- "1 wall" puts torches on one wall, "2 wall pairs" puts them on both walls at the same place, "2 wall alternating" puts them on alternating walls, "ceiling" puts them on the ceiling.
-	sign_spacing = nil, -- nil means no signs
-	sign_probability = 1, -- allows for erratic sign spacing
-	bridge_block = nil, -- if not nil, replaces air in floor
-	bridge_width = 0, -- width of bridge (same meaning as "width", so width of 1 gives a bridge 3 wide, and so forth)
-	stair_block = nil, -- also used for arches
-	floor_block = nil, -- when non-nil, replaces floor with this block type. Does not bridge air gaps.
-	wall_block = nil, -- when non-nil, replaces walls with this block type
-	ceiling_block = nil, -- when non-nil, replaces ceiling with this block type
-	slope = 2,
-	seal_lava_material = nil, -- replace lava blocks in walls with this material
-	seal_water_material = nil, -- replace water blocks in walls with this material
-	seal_air_material = nil, -- patch holes in walls and ceilings with this material. Use bridge material for patching floors.
-	width = 1, -- note: this is the number of blocks added on either side of the center block. So width 1 gives a tunnel 3 blocks wide, width 2 gives a tunnel 5 blocks wide, etc.
-	height = 3,
-	arch_spacing = nil, -- when 1, continuous arch. When 0 or nil, no arch.
-}
-
-local set_defaults = function(defaults, target)
-	for k, v in pairs(defaults) do
-		if target[k] == nil then
-			target[k] = v
-		end
-	end
-end
-
-function deep_roads.Context:segmentize_connection(connection, tunnel_def)
+function deep_roads.Context:segmentize_connection(connection)
 	math.randomseed(connection.val*1000000000)
-	
-	set_defaults(default_tunnel_def, tunnel_def)
-	
+
 	self:place_sign_on_ceiling(connection.pt1, "To " .. deep_roads.random_name(connection.pt2.val), 3)
 	self:place_sign_on_ceiling(connection.pt2, "To " .. deep_roads.random_name(connection.pt1.val), 3)
 	
-	self:draw_tunnel_segment(connection.pt1, connection.pt2, tunnel_def, nil)
+	self:draw_tunnel_segment(connection.pt1, connection.pt2, connection.def, nil)
 end
-
 
 function deep_roads.Context:place_sign(pos, name, param2)
 	local area = self.area
