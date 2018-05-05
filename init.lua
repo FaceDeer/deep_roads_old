@@ -7,7 +7,7 @@ dofile(modpath.."/functions.lua") --function definitions
 
 local gridscale = {x=1000, y=200, z=1000}
 local ymin = -2000
-local ymax = -10
+local ymax = 10
 local connection_probability = 0.75
 
 local data = {}
@@ -18,6 +18,7 @@ local c_stone = minetest.get_content_id("default:stone")
 local c_stonebrick = minetest.get_content_id("default:stonebrick")
 local c_stonebrickstair = minetest.get_content_id("stairs:stair_stonebrick")
 local c_gravel = minetest.get_content_id("default:gravel")
+local c_glass = minetest.get_content_id("default:glass")
 
 -- On generated function
 minetest.register_on_generated(function(minp, maxp, seed)
@@ -43,7 +44,7 @@ minetest.register_on_generated(function(minp, maxp, seed)
 	vm:get_data(data)
 	vm:get_param2_data(data_param2)
 
-	local context = deep_roads.Context:new(minp, maxp, area, data, data_param2, gridscale, ymin, ymax, connection_probability)
+	local context = deep_roads.Context:new(minp, maxp, area, data, data_param2, gridscale, ymin, ymax, seed, connection_probability)
 	
 	for _, pt in ipairs(context.points) do
 		--minetest.debug(minetest.pos_to_string(pt) .. " named " .. deep_roads.random_name(pt.val))
@@ -56,6 +57,7 @@ minetest.register_on_generated(function(minp, maxp, seed)
 		powered_rail = true,
 		bridge_block = c_wood,
 		seal_lava_material = c_stonebrick,
+		seal_water_material = c_glass,
 		
 		wall_block = c_stonebrick,
 		ceiling_block = c_stonebrick,

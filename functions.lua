@@ -5,14 +5,18 @@ local c_rail = minetest.get_content_id("carts:rail")
 local c_powerrail = minetest.get_content_id("carts:powerrail")
 local c_torch_wall = minetest.get_content_id("default:torch_wall")
 
+local c_wood_sign = minetest.get_content_id("default:sign_wall_wood")
+
+local nameparts_filename = "language.txt"
+
 local nameparts = {}
-local file = io.open(minetest.get_modpath(minetest.get_current_modname()).."/nameparts.txt", "r")
+local file = io.open(minetest.get_modpath(minetest.get_current_modname()).."/" .. nameparts_filename, "r")
 if file then
 	for line in file:lines() do
 		table.insert(nameparts, line)
 	end
 else
-	nameparts = {"Unable to read nameparts.txt"}
+	nameparts = {"Unable to read " .. nameparts_filename}
 end
 
 deep_roads.Context = {}
@@ -123,6 +127,9 @@ function deep_roads.Context:new(minp, maxp, area, data, data_param2, gridscale, 
 	context.area = area
 	context.chunk_min = minp
 	context.chunk_max = maxp
+	context.gridscale = gridscale
+	context.ymin = ymin
+	context.ymax = ymax
 	
 	context.points = road_points_around(minp, gridscale, ymin, ymax)
 	context.connections = find_connections(context.points, gridscale, connection_probability)
@@ -172,14 +179,16 @@ function deep_roads.Context:place_every(iterator, axis, intermittency, node, els
 	local data_param2 = self.data_param2
 	local locked_indices = self.locked_indices
 	for pi in iterator do
-		if area:position(pi)[axis] % intermittency == 0 then
-			data[pi] = node
-			if param2 ~= nil then data_param2[pi] = param2 end
-		elseif else_node ~= nil then
-			data[pi] = else_node
-			if else_param2 ~= nil then data_param2[pi] = else_param2 end
+		if not locked_indices[pi] then
+			if area:position(pi)[axis] % intermittency == 0 then
+				data[pi] = node
+				if param2 ~= nil then data_param2[pi] = param2 end
+			elseif else_node ~= nil then
+				data[pi] = else_node
+				if else_param2 ~= nil then data_param2[pi] = else_param2 end
+			end
+			locked_indices[pi] = true
 		end
-		locked_indices[pi] = true
 	end
 end
 
@@ -511,9 +520,8 @@ function deep_roads.Context:carve_intersection(point, radius)
 		for pi in area:iterp(intersectmin, intersectmax) do
 			data[pi] = c_air
 		end
+		self:place_sign(point, "You are in: " .. deep_roads.random_name(point.val), 1)
 	end
-	
-
 end
 
 local draw_tunnel_segment -- initial declaration to allow recursion
@@ -657,13 +665,31 @@ local set_defaults = function(defaults, target)
 end
 
 function deep_roads.Context:segmentize_connection(connection, tunnel_def)
-
-	local next_seed = math.random(1, 1000000000)
 	math.randomseed(connection.val*1000000000)
 	
 	set_defaults(default_tunnel_def, tunnel_def)
 	
-	self:draw_tunnel_segment(connection.pt1, connection.pt2, tunnel_def, nil)
+	self:place_sign(connection.pt1, "To: " .. deep_roads.random_name(connection.pt2.val), 1)
+	self:place_sign(connection.pt2, "To: " .. deep_roads.random_name(connection.pt1.val), 1)
 	
-	math.randomseed(next_seed)
+	self:draw_tunnel_segment(connection.pt1, connection.pt2, tunnel_def, nil)
+end
+
+
+function deep_roads.Context:place_sign(pos, name, param2)
+	local area = self.area
+	local data = self.data
+	local data_param2 = self.data_param2
+	if area:containsp(pos) then
+		local pi = area:indexp(pos)
+		if not self.locked_indices[pi] then
+			self.locked_indices[pi] = true
+			data[pi] = c_wood_sign
+			data_param2[pi] = param2
+			local meta = minetest.get_meta(pos)
+			meta:set_string("formspec","field[text;;${text}]")
+			meta:set_string("infotext", '"' .. name .. '"')
+			meta:set_string("text", name)
+		end
+	end
 end
