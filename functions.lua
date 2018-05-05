@@ -6,6 +6,7 @@ local c_powerrail = minetest.get_content_id("carts:powerrail")
 local c_torch_wall = minetest.get_content_id("default:torch_wall")
 
 local c_wood_sign = minetest.get_content_id("default:sign_wall_wood")
+local c_mese_post = minetest.get_content_id("default:mese_post_light")
 
 local nameparts_filename = "language.txt"
 
@@ -21,6 +22,15 @@ end
 
 deep_roads.Context = {}
 
+
+local simple_copy = function(t)
+	local r = {}
+	for k, v in pairs(t) do
+		r[k] = v
+	end
+	return r
+end
+
 -- Grid stuff
 --------------------------------------------------
 
@@ -28,7 +38,7 @@ function deep_roads.Context:scatter_3d(min_xyz, min_output_size, max_output_size
 	local gridscale_xyz = self.gridscale
 	
 	local next_seed = math.random(1, 1000000000)
-	math.randomseed(min_xyz.x + min_xyz.z * 2 ^ 8 + min_xyz.y * 2 ^ 16 + self.seed)
+	math.randomseed(min_xyz.x + min_xyz.z * 2 ^ 8 + min_xyz.y * 2 ^ 16 + self.seed * 2 ^ 24)
 	local count = math.random(min_output_size, max_output_size)
 	local result = {}
 	while count > 0 do
@@ -78,16 +88,7 @@ end
 -- Connection stuff
 ------------------------------------------------------
 
-local jitterval = 16
-local jittervaldiv2 = 8
-
--- This ensures that all the roads don't converge into a single tunnel as they approach a junction. Makes junctions more interesting.
-local jitter_point = function(jitter, point)
-	return {x = point.x+jitter.x,
-			y = point.y+jitter.y,
-			z = point.z+jitter.z,
-			val = point.val}
-end
+local endpoint_displace = 8
 
 function deep_roads.Context:find_connections(odds)
 	local points = self.points
@@ -96,23 +97,27 @@ function deep_roads.Context:find_connections(odds)
 	-- Do a triangular array comparison, ensuring that each pair is tested only once.
 	for index1 = 1, table.getn(points) do
 		for index2 = index1 + 1, table.getn(points) do
-			local point1 = points[index1]
-			local point2 = points[index2]
+			local point1 = simple_copy(points[index1])
+			local point2 = simple_copy(points[index2])
 			local diff = vector.subtract(point1, point2)
 			if math.abs(diff.x) < gridscale.x and math.abs(diff.y) < gridscale.y and math.abs(diff.z) < gridscale.z then -- Ensure no pair under consideration is more than a grid-length away on any axis.
 				local combined = (point1.val * 100000 + point2.val * 100000) % 1 -- Combine the two random values and then take the fractional portion to get back to 0-1 range
 				if combined < odds then
 					local connection_val = combined/odds
-					-- This moves the endpoints of the connection around a bit to hopefully make them collide less.
-					local jitter = {
-						x = math.floor((connection_val * 1000 % 1) * jitterval - jittervaldiv2),
-						y = 0,
-						z = math.floor((connection_val * 1000000 % 1) * jitterval - jittervaldiv2)
-					}
+					local dir = vector.direction(point1, point2)
+					dir.x = math.ceil(dir.x * endpoint_displace)
+					dir.z = math.ceil(dir.z * endpoint_displace)
+					
+					point1.x = point1.x + dir.x
+					point1.z = point1.z + dir.z
+					
+					point2.x = point2.x - dir.x
+					point2.z = point2.z - dir.z
+
 					if point1.x + point1.y + point1.z > point2.x + point2.y + point2.z then -- always sort each pair of points the same way.
-						table.insert(connections, {pt1 = jitter_point(jitter, point1), pt2 = jitter_point(jitter, point2), val = connection_val})
+						table.insert(connections, {pt1 = point1, pt2 = point2, val = connection_val})
 					else
-						table.insert(connections, {pt1 = jitter_point(jitter, point2), pt2 = jitter_point(jitter, point1), val = connection_val})
+						table.insert(connections, {pt1 = point2, pt2 = point1, val = connection_val})
 					end
 				end
 			end
@@ -124,7 +129,7 @@ end
 --------------------------------------------------------------------
 
 function deep_roads.Context:new(minp, maxp, area, data, data_param2, gridscale, ymin, ymax, connection_probability)
-	context = {}
+	local context = {}
 	setmetatable(context, self)
 	self.__index = self
 	context.locked_indices = {}
@@ -200,7 +205,7 @@ function deep_roads.Context:place_every(iterator, axis, intermittency, node, els
 end
 
 function deep_roads.Context:modify_slab(corner1, corner2, tunnel_def, slab_block, seal_air_material, seal_water_material, seal_lava_material)
-	intersectmin, intersectmax = intersect(corner1, corner2, self.chunk_min, self.chunk_max)
+	local intersectmin, intersectmax = intersect(corner1, corner2, self.chunk_min, self.chunk_max)
 	local data = self.data
 	local locked_indices = self.locked_indices
 	
@@ -215,7 +220,7 @@ function deep_roads.Context:modify_slab(corner1, corner2, tunnel_def, slab_block
 					data[pi] = seal_lava_material
 				elseif seal_water_material and current_material == c_water then
 					data[pi] = seal_water_material
-				elseif current_material ~= c_air and current_material ~= c_lava and current_material ~= c_water then
+				elseif slab_block and current_material ~= c_air and current_material ~= c_lava and current_material ~= c_water then
 					data[pi] = slab_block
 				end
 			end
@@ -294,8 +299,8 @@ function deep_roads.Context:drawxz(pos1, pos2, tunnel_def)
 		end
 		
 		if tunnel_def.torch_spacing then
-			torch1 = vector.new(path1)
-			torch2 = vector.new(path2)
+			local torch1 = vector.new(path1)
+			local torch2 = vector.new(path2)
 			if tunnel_def.torch_arrangement == "1 wall" or tunnel_def.torch_arrangement == "2 wall pairs" then
 				torch1.y = torch1.y + tunnel_def.torch_height
 				torch2.y = torch2.y + tunnel_def.torch_height
@@ -322,8 +327,6 @@ function deep_roads.Context:drawxz(pos1, pos2, tunnel_def)
 		if trench_block and displace > 0 and corner2[length_axis]-corner1[length_axis] > displace*2 then
 			local trenchside1 = vector.new(path1)
 			local trenchside2 = vector.new(path2)
---			trenchside1[length_axis] = trenchside1[length_axis]+displace -- to ensure trench walls don't overlap in corners
---			trenchside2[length_axis] = trenchside2[length_axis]-displace
 			trenchside1[width_axis] = trenchside1[width_axis]-displace
 			trenchside2[width_axis] = trenchside2[width_axis]-displace
 			intersectmin, intersectmax = intersect(trenchside1, trenchside2, self.chunk_min, self.chunk_max)
@@ -493,7 +496,7 @@ function deep_roads.Context:drawy(pos1, pos2, tunnel_def)
 				end
 			
 				if area:containsp(midpoint) then
-					pi = area:indexp(midpoint)
+					local pi = area:indexp(midpoint)
 					data[pi] = railnode
 					locked_indices[pi] = true
 				end
@@ -530,7 +533,7 @@ function deep_roads.Context:carve_intersection(point, radius)
 		for pi in area:iterp(intersectmin, intersectmax) do
 			data[pi] = c_air
 		end
-		self:place_sign(point, "You are in: " .. deep_roads.random_name(point.val), 1)
+		self:place_sign_on_post(point, "Welcome to " .. deep_roads.random_name(point.val))
 	end
 end
 
@@ -679,8 +682,8 @@ function deep_roads.Context:segmentize_connection(connection, tunnel_def)
 	
 	set_defaults(default_tunnel_def, tunnel_def)
 	
-	self:place_sign(connection.pt1, "To: " .. deep_roads.random_name(connection.pt2.val), 1)
-	self:place_sign(connection.pt2, "To: " .. deep_roads.random_name(connection.pt1.val), 1)
+	self:place_sign_on_ceiling(connection.pt1, "To " .. deep_roads.random_name(connection.pt2.val), 3)
+	self:place_sign_on_ceiling(connection.pt2, "To " .. deep_roads.random_name(connection.pt1.val), 3)
 	
 	self:draw_tunnel_segment(connection.pt1, connection.pt2, tunnel_def, nil)
 end
@@ -696,6 +699,61 @@ function deep_roads.Context:place_sign(pos, name, param2)
 			self.locked_indices[pi] = true
 			data[pi] = c_wood_sign
 			data_param2[pi] = param2
+			local meta = minetest.get_meta(pos)
+			meta:set_string("formspec","field[text;;${text}]")
+			meta:set_string("infotext", '"' .. name .. '"')
+			meta:set_string("text", name)
+		end
+	end
+end
+
+function deep_roads.Context:place_sign_on_post(posparam, name)
+	local pos = vector.new(posparam)
+	local area = self.area
+	local data = self.data
+	local data_param2 = self.data_param2
+	if area:containsp(pos) then
+		local pi = area:indexp(pos)
+		if not self.locked_indices[pi] then
+			self.locked_indices[pi] = true
+			data[pi] = c_mese_post
+		end
+	end
+	pos.y = pos.y + 1
+	if area:containsp(pos) then
+		local pi = area:indexp(pos)
+		if not self.locked_indices[pi] then
+			self.locked_indices[pi] = true
+			data[pi] = c_wood_sign
+			data_param2[pi] = 1
+			local meta = minetest.get_meta(pos)
+			meta:set_string("formspec","field[text;;${text}]")
+			meta:set_string("infotext", '"' .. name .. '"')
+			meta:set_string("text", name)
+		end
+	end
+end
+
+function deep_roads.Context:place_sign_on_ceiling(posparam, name, height)
+	local pos = vector.new(posparam)
+	pos.y = pos.y + height
+	local area = self.area
+	local data = self.data
+	local data_param2 = self.data_param2
+	if area:containsp(pos) then
+		local pi = area:indexp(pos)
+		if not self.locked_indices[pi] then
+			self.locked_indices[pi] = true
+			data[pi] = c_mese_post
+		end
+	end
+	pos.y = pos.y - 1
+	if area:containsp(pos) then
+		local pi = area:indexp(pos)
+		if not self.locked_indices[pi] then
+			self.locked_indices[pi] = true
+			data[pi] = c_wood_sign
+			data_param2[pi] = 0
 			local meta = minetest.get_meta(pos)
 			meta:set_string("formspec","field[text;;${text}]")
 			meta:set_string("infotext", '"' .. name .. '"')

@@ -13,6 +13,7 @@ local connection_probability = 0.75
 local data = {}
 local data_param2 = {}
 
+local c_water = minetest.get_content_id("default:water_source")
 local c_wood = minetest.get_content_id("default:wood")
 local c_stone = minetest.get_content_id("default:stone")
 local c_stonebrick = minetest.get_content_id("default:stonebrick")
