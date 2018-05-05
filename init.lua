@@ -6,6 +6,9 @@ local modpath = minetest.get_modpath(minetest.get_current_modname())
 dofile(modpath.."/functions.lua") --function definitions
 
 local gridscale = {x=1000, y=200, z=1000}
+local ymin = -2000
+local ymax = -10
+local connection_probability = 0.75
 
 local data = {}
 local data_param2 = {}
@@ -40,17 +43,13 @@ minetest.register_on_generated(function(minp, maxp, seed)
 	vm:get_data(data)
 	vm:get_param2_data(data_param2)
 
-	local context = deep_roads.Context:new(minp, maxp, area, data, data_param2)
+	local context = deep_roads.Context:new(minp, maxp, area, data, data_param2, gridscale, ymin, ymax, connection_probability)
 	
-	local points = deep_roads.road_points_around(minp, gridscale, -2000, -10)
-	
-	for _, pt in ipairs(points) do
+	for _, pt in ipairs(context.points) do
 		--minetest.debug(minetest.pos_to_string(pt) .. " named " .. deep_roads.random_name(pt.val))
 		context:carve_intersection(pt, 8)
 	end
 	
-	local connections = deep_roads.find_connections(points, gridscale, 0.75)
-
 	local tunnel_def = 
 	{
 		rail = true,-- math.random() < 0.75,
@@ -63,6 +62,9 @@ minetest.register_on_generated(function(minp, maxp, seed)
 		
 		torch_spacing = 8,
 		torch_height = 2,
+		--width = 2,
+		--height = 4,
+		
 	}
 	local narrow_tunnel = 
 	{
@@ -81,7 +83,7 @@ minetest.register_on_generated(function(minp, maxp, seed)
 
 	
 	
-	for _, conn in ipairs(connections) do
+	for _, conn in ipairs(context.connections) do
 		--minetest.debug(deep_roads.random_name(conn.pt1.val) .. " connected to " .. deep_roads.random_name(conn.pt2.val) .. " with val " .. tostring(conn.val))
 		context:segmentize_connection(conn, tunnel_def)
 	end

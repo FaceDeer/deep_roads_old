@@ -17,33 +17,8 @@ end
 
 deep_roads.Context = {}
 
-function deep_roads.Context:new(minp, maxp, area, data, data_param2)
-	context = {}
-	setmetatable(context, self)
-	self.__index = self
-	context.locked_indices = {}
-	context.data = data
-	context.data_param2 = data_param2
-	context.area = area
-	context.chunk_min = minp
-	context.chunk_max = maxp
-	return context
-end
-
-
-local get_sign = function(num)
-	if num > 0 then return 1 else return -1 end
-end
-
-local random_sign = function()
-	if math.random() > 0.5 then return 1 else return -1 end
-end
-
-deep_roads.random_name = function(rand)
-	local prefix = math.floor(rand * 2^16) % table.getn(nameparts) + 1
-	local suffix = math.floor(rand * 2^32) % table.getn(nameparts) + 1
-	return (nameparts[prefix] .. nameparts[suffix]):gsub("^%l", string.upper)
-end
+-- Grid stuff
+--------------------------------------------------
 
 local scatter_3d = function(min_xyz, gridscale_xyz, min_output_size, max_output_size)
 	local next_seed = math.random(1, 1000000000)
@@ -64,15 +39,8 @@ local scatter_3d = function(min_xyz, gridscale_xyz, min_output_size, max_output_
 	return result
 end
 
-deep_roads.road_points_around = function(pos, gridscale_xyz, min_y, max_y)
-	local corner = {
-		x = math.floor(pos.x / gridscale_xyz.x),
-		y = math.floor(pos.y / gridscale_xyz.y),
-		z = math.floor(pos.z / gridscale_xyz.z)}
-	return deep_roads.get_grid_and_adjacent(corner, gridscale_xyz, 1, 4, min_y, max_y)
-end
 
-deep_roads.get_grid_and_adjacent = function(min_xyz, gridscale_xyz, min_output_size, max_output_size, min_y, max_y)
+local get_grid_and_adjacent = function(min_xyz, gridscale_xyz, min_output_size, max_output_size, min_y, max_y)
 	local result = {}
 	
 	for x_grid = -1, 1 do
@@ -91,6 +59,17 @@ deep_roads.get_grid_and_adjacent = function(min_xyz, gridscale_xyz, min_output_s
 	return result
 end
 
+local road_points_around = function(pos, gridscale_xyz, min_y, max_y)
+	local corner = {
+		x = math.floor(pos.x / gridscale_xyz.x),
+		y = math.floor(pos.y / gridscale_xyz.y),
+		z = math.floor(pos.z / gridscale_xyz.z)}
+	return get_grid_and_adjacent(corner, gridscale_xyz, 1, 4, min_y, max_y)
+end
+
+-- Connection stuff
+------------------------------------------------------
+
 local jitterval = 16
 local jittervaldiv2 = 8
 
@@ -102,7 +81,7 @@ local jitter_point = function(jitter, point)
 			val = point.val}
 end
 
-deep_roads.find_connections = function(points, gridscale, odds)
+local find_connections = function(points, gridscale, odds)
 	local connections = {}
 	-- Do a triangular array comparison, ensuring that each pair is tested only once.
 	for index1 = 1, table.getn(points) do
@@ -130,6 +109,41 @@ deep_roads.find_connections = function(points, gridscale, odds)
 		end
 	end
 	return connections
+end
+
+--------------------------------------------------------------------
+
+function deep_roads.Context:new(minp, maxp, area, data, data_param2, gridscale, ymin, ymax, connection_probability)
+	context = {}
+	setmetatable(context, self)
+	self.__index = self
+	context.locked_indices = {}
+	context.data = data
+	context.data_param2 = data_param2
+	context.area = area
+	context.chunk_min = minp
+	context.chunk_max = maxp
+	
+	context.points = road_points_around(minp, gridscale, ymin, ymax)
+	context.connections = find_connections(context.points, gridscale, connection_probability)
+
+	
+	return context
+end
+
+
+local get_sign = function(num)
+	if num > 0 then return 1 else return -1 end
+end
+
+local random_sign = function()
+	if math.random() > 0.5 then return 1 else return -1 end
+end
+
+deep_roads.random_name = function(rand)
+	local prefix = math.floor(rand * 2^16) % table.getn(nameparts) + 1
+	local suffix = math.floor(rand * 2^32) % table.getn(nameparts) + 1
+	return (nameparts[prefix] .. nameparts[suffix]):gsub("^%l", string.upper)
 end
 
 -- Finds an intersection between two AABBs, or nil if there's no overlap
@@ -169,7 +183,7 @@ function deep_roads.Context:place_every(iterator, axis, intermittency, node, els
 	end
 end
 
-function deep_roads.Context:modify_slab(corner1, corner2, tunnel_def, slab_block, seal_water_material, seal_lava_material)
+function deep_roads.Context:modify_slab(corner1, corner2, tunnel_def, slab_block, seal_air_material, seal_water_material, seal_lava_material)
 	intersectmin, intersectmax = intersect(corner1, corner2, self.chunk_min, self.chunk_max)
 	local data = self.data
 	local locked_indices = self.locked_indices
@@ -177,7 +191,9 @@ function deep_roads.Context:modify_slab(corner1, corner2, tunnel_def, slab_block
 	if intersectmin ~= nil then
 		for pi in self.area:iterp(intersectmin, intersectmax) do
 			if not locked_indices[pi] then
-				if seal_lava_material and data[pi] == c_lava then
+				if seal_air_material and data[pi] == c_air then
+					data[pi] = seal_air_material
+				elseif seal_lava_material and data[pi] == c_lava then
 					data[pi] = seal_lava_material
 				elseif seal_water_material and data[pi] == c_water then
 					data[pi] = seal_water_material
@@ -336,6 +352,7 @@ function deep_roads.Context:drawxz(pos1, pos2, tunnel_def)
 	local floor_block = tunnel_def.floor_block
 	local seal_lava_material = tunnel_def.seal_lava_material
 	local seal_water_material = tunnel_def.seal_water_material
+	local seal_air_material = tunnel_def.seal_air_material
 	local bridge_block = tunnel_def.bridge_block
 	local ceiling_block = tunnel_def.ceiling_block
 	local wall_block = tunnel_def.wall_block
@@ -347,7 +364,7 @@ function deep_roads.Context:drawxz(pos1, pos2, tunnel_def)
 		floor1[width_axis] = floor1[width_axis] - (displace)
 		floor2[width_axis] = floor2[width_axis] + (displace)
 
-		self:modify_slab(floor1, floor2, tunnel_def, floor_block, seal_water_material, seal_lava_material)
+		self:modify_slab(floor1, floor2, tunnel_def, floor_block, nil, seal_water_material, seal_lava_material)
 	end
 	if bridge_block then
 		local bridge1 = vector.new(path1.x, path1.y-1, path1.z)
@@ -370,7 +387,7 @@ function deep_roads.Context:drawxz(pos1, pos2, tunnel_def)
 		local ceiling2 = vector.new(path2.x, path2.y+height, path2.z)
 		ceiling1[width_axis] = ceiling1[width_axis] - (displace)
 		ceiling2[width_axis] = ceiling2[width_axis] + (displace)
-		self:modify_slab(ceiling1, ceiling2, tunnel_def, ceiling_block, seal_water_material, seal_lava_material)
+		self:modify_slab(ceiling1, ceiling2, tunnel_def, ceiling_block, seal_air_material, seal_water_material, seal_lava_material)
 	end
 
 	if wall_block or seal_lava_material or seal_water_material then
@@ -378,10 +395,10 @@ function deep_roads.Context:drawxz(pos1, pos2, tunnel_def)
 		local wall2 = vector.new(path2.x, path2.y+height-1, path2.z)
 		wall1[width_axis] = wall1[width_axis] - (displace+1)
 		wall2[width_axis] = wall2[width_axis] - (displace+1)
-		self:modify_slab(wall1, wall2, tunnel_def, wall_block, seal_water_material, seal_lava_material)
+		self:modify_slab(wall1, wall2, tunnel_def, wall_block, seal_air_material, seal_water_material, seal_lava_material)
 		wall1[width_axis] = wall1[width_axis] + 2*displace+2
 		wall2[width_axis] = wall2[width_axis] + 2*displace+2
-		self:modify_slab(wall1, wall2, tunnel_def, wall_block, seal_water_material, seal_lava_material)
+		self:modify_slab(wall1, wall2, tunnel_def, wall_block, seal_air_material, seal_water_material, seal_lava_material)
 	end
 end
 
@@ -625,6 +642,7 @@ local default_tunnel_def =
 	slope = 2,
 	seal_lava_material = nil, -- replace lava blocks in walls with this material
 	seal_water_material = nil, -- replace water blocks in walls with this material
+	seal_air_material = nil, -- patch holes in walls and ceilings with this material. Use bridge material for patching floors.
 	width = 1, -- note: this is the number of blocks added on either side of the center block. So width 1 gives a tunnel 3 blocks wide, width 2 gives a tunnel 5 blocks wide, etc.
 	height = 3,
 	arch_spacing = nil, -- when 1, continuous arch. When 0 or nil, no arch.
