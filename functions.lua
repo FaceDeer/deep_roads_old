@@ -223,24 +223,49 @@ local intersect = function(minpos1, maxpos1, minpos2, maxpos2)
 	return nil, nil
 end
 
-function deep_roads.Context:place_every(iterator, axis, intermittency, node, else_node, param2, else_param2)
+function deep_roads.Context:place_rail(iterator, axis, intermittency, node, else_node)
+	local area = self.area
+	local data = self.data
+	local locked_indices = self.locked_indices
+	for pi in iterator do
+		if not locked_indices[pi] then
+			if area:position(pi)[axis] % intermittency == 0 then
+				data[pi] = node
+			elseif else_node ~= nil then
+				data[pi] = else_node
+			end
+			locked_indices[pi] = true
+		end
+	end
+end
+
+local provides_support = function(node)
+	if not (node == c_air or node == c_water or node == c_lava) then
+		return true
+	end
+	return false
+end
+
+function deep_roads.Context:place_torch(iterator, axis, intermittency, backing_axis, backing_dir, node, param2)
 	local area = self.area
 	local data = self.data
 	local data_param2 = self.data_param2
 	local locked_indices = self.locked_indices
 	for pi in iterator do
 		if not locked_indices[pi] then
-			if area:position(pi)[axis] % intermittency == 0 then
-				data[pi] = node
-				if param2 ~= nil then data_param2[pi] = param2 end
-			elseif else_node ~= nil then
-				data[pi] = else_node
-				if else_param2 ~= nil then data_param2[pi] = else_param2 end
+			local pos = area:position(pi)
+			if pos[axis] % intermittency == 0 then
+				pos[backing_axis] = pos[backing_axis] + backing_dir
+				if not area:containsp(pos) or provides_support(data[area:indexp(pos)]) then
+					data[pi] = node
+					data_param2[pi] = param2
+					locked_indices[pi] = true
+				end
 			end
-			locked_indices[pi] = true
 		end
 	end
 end
+
 
 function deep_roads.Context:modify_slab(corner1, corner2, tunnel_def, slab_block, seal_air_material, seal_water_material, seal_lava_material)
 	local intersectmin, intersectmax = intersect(corner1, corner2, self.chunk_min, self.chunk_max)
@@ -331,8 +356,8 @@ function deep_roads.Context:drawxz(pos1, pos2, tunnel_def)
 			if tunnel_def.powered_rail then powered_rail = c_powerrail else powered_rail = c_rail end
 			intersectmin, intersectmax = intersect(path1, path2, self.chunk_min, self.chunk_max)
 			if intersectmin ~= nil then
-				self:place_every(area:iterp(intersectmin, intersectmax),
-					length_axis, 14, powered_rail, c_rail, nil, nil)
+				self:place_rail(area:iterp(intersectmin, intersectmax),
+					length_axis, 14, powered_rail, c_rail)
 			end
 		end
 		
@@ -352,8 +377,8 @@ function deep_roads.Context:drawxz(pos1, pos2, tunnel_def)
 					else
 						torch_param2 = 4
 					end
-					self:place_every(area:iterp(intersectmin, intersectmax),
-						length_axis, tunnel_def.torch_spacing, c_torch_wall, nil, torch_param2)
+					self:place_torch(area:iterp(intersectmin, intersectmax),
+						length_axis, tunnel_def.torch_spacing, width_axis, 1, c_torch_wall, torch_param2)
 				end
 			end		
 		end
