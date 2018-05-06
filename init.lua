@@ -20,6 +20,7 @@ local c_stonebrick = minetest.get_content_id("default:stonebrick")
 local c_stonebrickstair = minetest.get_content_id("stairs:stair_stonebrick")
 local c_gravel = minetest.get_content_id("default:gravel")
 local c_glass = minetest.get_content_id("default:glass")
+local c_fence = minetest.get_content_id("default:fence_wood")
 
 
 local tunnel_def = 
@@ -29,6 +30,10 @@ local tunnel_def =
 	bridge_block = c_wood,
 	seal_lava_material = c_stonebrick,
 	seal_water_material = c_glass,
+	
+	bridge_support_block = c_fence,
+	bridge_support_spacing = 3,
+	--bridge_width = 3,
 	
 	--wall_block = c_stonebrick,
 	--ceiling_block = c_stonebrick,

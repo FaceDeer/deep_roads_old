@@ -88,6 +88,7 @@ bake
 balance
 bald
 ball
+balloon
 band
 bandit
 bane
@@ -97,6 +98,8 @@ bar
 barb
 barbarian
 barbarity
+baron
+baroness
 barricade
 basalt
 basement
@@ -161,6 +164,7 @@ blockade
 blood
 bloodstone
 bloody
+bloom
 blossom
 blot
 blotch
@@ -285,6 +289,7 @@ cavity
 cavort
 ceiling
 celebrate
+celestial
 cell
 certain
 cerulean
@@ -304,6 +309,7 @@ charm
 chartreuse
 chasm
 chastity
+cheer
 cheerful
 cheese
 cherish
@@ -553,6 +559,7 @@ direct
 dirge
 dirt
 disappear
+discord
 discover
 disembowel
 disembowelment
@@ -608,6 +615,7 @@ droplet
 drowned
 drum
 dry
+duke
 dull
 dump
 dumpling
@@ -616,6 +624,7 @@ dung
 dungeon
 dusk
 dust
+dutchess
 duty
 dwarf
 dwell
@@ -754,6 +763,7 @@ fluke
 fluorite
 flush
 flute
+flutter
 fly
 focus
 fog
@@ -1034,6 +1044,7 @@ infallible
 infamy
 infect
 inferior
+infernal
 inferno
 infinite
 influence
@@ -1048,6 +1059,7 @@ intense
 intensity
 interior
 intricate
+inverse
 invisible
 iron
 island
@@ -1087,6 +1099,7 @@ kindness
 king
 kingdom
 kiss
+knave
 knead
 knife
 knight
@@ -1182,6 +1195,7 @@ loyalty
 lucid
 luck
 lull
+lunar
 lunch
 lung
 lurch
@@ -1424,6 +1438,7 @@ path
 pattern
 peace
 peach
+peacock
 peak
 pear
 pearl
@@ -1447,6 +1462,7 @@ phantom
 phlegm
 phrase
 pick
+pie
 pig
 pillar
 pimple
@@ -1553,6 +1569,7 @@ rag
 rage
 rail
 rain
+rainbow
 rake
 ram
 rampage
@@ -1564,6 +1581,7 @@ ransack
 rapid
 raptor
 rare
+rarity
 rasp
 rat
 raunch
@@ -1683,6 +1701,7 @@ scholar
 scintillate
 scold
 scoop
+scoot
 scorch
 scorn
 scorpion
@@ -1716,6 +1735,7 @@ sell
 sense
 sensual
 sepia
+serendipity
 serpent
 serpentine
 servant
@@ -2069,6 +2089,7 @@ trail
 trammel
 trample
 trance
+tranquil
 trap
 trash
 treason

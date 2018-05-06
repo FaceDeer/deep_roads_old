@@ -34,6 +34,8 @@ local default_tunnel_def =
 	sign_probability = 1, -- allows for erratic sign spacing
 	bridge_block = nil, -- if not nil, replaces air in floor
 	bridge_width = 0, -- width of bridge (same meaning as "width", so width of 1 gives a bridge 3 wide, and so forth)
+	bridge_support_spacing = 12, -- Bridge supports are not guaranteed, if mapgen can't find a base below the bridge in the current chunk it won't draw a support. This limits the height supports can go.
+	bridge_support_block = nil,
 	stair_block = nil, -- also used for arches
 	floor_block = nil, -- when non-nil, replaces floor with this block type. Does not bridge air gaps.
 	wall_block = nil, -- when non-nil, replaces walls with this block type
@@ -266,7 +268,6 @@ function deep_roads.Context:place_torch(iterator, axis, intermittency, backing_a
 	end
 end
 
-
 function deep_roads.Context:modify_slab(corner1, corner2, tunnel_def, slab_block, seal_air_material, seal_water_material, seal_lava_material)
 	local intersectmin, intersectmax = intersect(corner1, corner2, self.chunk_min, self.chunk_max)
 	local data = self.data
@@ -285,6 +286,38 @@ function deep_roads.Context:modify_slab(corner1, corner2, tunnel_def, slab_block
 					data[pi] = seal_water_material
 				elseif slab_block and current_material ~= c_air and current_material ~= c_lava and current_material ~= c_water then
 					data[pi] = slab_block
+				end
+			end
+		end
+	end
+end
+
+function deep_roads.Context:draw_bridge_support(pi, length_axis, bridge_support_spacing, bridge_support_block)
+	local area = self.area
+	local pos = area:position(pi)
+	if pos[length_axis] % bridge_support_spacing == 0 then
+		local data = self.data
+		local x = pos.x
+		local z = pos.z
+		local bridge_start = nil
+		local bridge_end = nil
+		for y = pos.y-1, self.chunk_min.y, -1 do
+			local content = data[area:index(x, y, z)]
+			if not provides_support(content) then
+				if bridge_start == nil then
+					bridge_start = vector.new(x,y,z)
+				end
+			else
+				bridge_end = vector.new(x,y+1,z)
+				break
+			end
+		end
+		
+		if bridge_start ~= nil and bridge_end ~= nil then
+			local locked_indices = self.locked_indices
+			for si in area:iterp(bridge_end, bridge_start) do
+				if not locked_indices[si] then
+					data[si] = bridge_support_block
 				end
 			end
 		end
@@ -438,6 +471,8 @@ function deep_roads.Context:drawxz(pos1, pos2, tunnel_def)
 	local seal_water_material = tunnel_def.seal_water_material
 	local seal_air_material = tunnel_def.seal_air_material
 	local bridge_block = tunnel_def.bridge_block
+	local bridge_support_spacing = tunnel_def.bridge_support_spacing
+	local bridge_support_block = tunnel_def.bridge_support_block
 	local ceiling_block = tunnel_def.ceiling_block
 	local wall_block = tunnel_def.wall_block
 	
@@ -449,10 +484,12 @@ function deep_roads.Context:drawxz(pos1, pos2, tunnel_def)
 		intersectmin, intersectmax = intersect(bridge1, bridge2, self.chunk_min, self.chunk_max)
 		if intersectmin ~= nil then
 			for pi in area:iterp(intersectmin, intersectmax) do
-				local current_material = data[pi]
-				if current_material == c_air or current_material == c_water or current_material == c_lava then
+				if not provides_support(data[pi]) then
 					data[pi] = bridge_block
 					locked_indices[pi] = true
+					if bridge_support_block ~= nil then
+						self:draw_bridge_support(pi, length_axis, bridge_support_spacing, bridge_support_block)
+					end
 				end
 			end
 		end
