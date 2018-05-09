@@ -235,26 +235,6 @@ local provides_support = function(node)
 	return false
 end
 
-function deep_roads.Context:place_torch(iterator, axis, intermittency, backing_axis, backing_dir, node, param2)
-	local area = self.area
-	local data = self.data
-	local data_param2 = self.data_param2
-	local locked_indices = self.locked_indices
-	for pi in iterator do
-		if not locked_indices[pi] then
-			local pos = area:position(pi)
-			if pos[axis] % intermittency == 0 then
-				pos[backing_axis] = pos[backing_axis] + backing_dir
-				if not area:containsp(pos) or provides_support(data[area:indexp(pos)]) then
-					data[pi] = node
-					data_param2[pi] = param2
-					locked_indices[pi] = true
-				end
-			end
-		end
-	end
-end
-
 function deep_roads.Context:modify_slab(corner1, corner2, tunnel_def, slab_block, seal_air_material, seal_water_material, seal_lava_material)
 	intersectmin, intersectmax = intersect(corner1, corner2, self.chunk_min, self.chunk_max)
 	local data = self.data
@@ -278,6 +258,9 @@ function deep_roads.Context:modify_slab(corner1, corner2, tunnel_def, slab_block
 		end
 	end
 end
+
+-------------------------------------------------------------------
+-- Bridges
 
 function deep_roads.Context:draw_bridge_support(pi, length_axis, bridge_support_spacing, bridge_support_block)
 	local area = self.area
@@ -311,26 +294,6 @@ function deep_roads.Context:draw_bridge_support(pi, length_axis, bridge_support_
 	end
 end
 
--- from_dir leaves the wall on that side open
---TODO: all the detail work (wall material, bridge, trench, etc)
-function deep_roads.Context:drawcorner(pos, tunnel_def, from_dir)
-	local corner1 = vector.new(pos.x - tunnel_def.width, pos.y, pos.z - tunnel_def.width)
-	local corner2 = vector.new(pos.x + tunnel_def.width, pos.y + tunnel_def.height - 1, pos.z + tunnel_def.width)
-		
-	intersectmin, intersectmax = intersect(corner1, corner2, self.chunk_min, self.chunk_max)
-	local locked_indices = self.locked_indices
-	local data = self.data
-	
-	if intersectmin ~= nil then
-		for pi in self.area:iterp(intersectmin, intersectmax) do
-			if not locked_indices[pi] then
-				data[pi] = c_air
-			end
-		end		
-	end
-end
-
-
 function deep_roads.Context:draw_bridge(path1, path2, width_axis, length_axis, tunnel_def)
 	local bridge_block = tunnel_def.bridge_block
 	local bridge_support_block = tunnel_def.bridge_support_block
@@ -356,6 +319,30 @@ function deep_roads.Context:draw_bridge(path1, path2, width_axis, length_axis, t
 	end
 end
 
+----------------------------------------------------------------------------
+-- Torches
+
+function deep_roads.Context:place_torch(iterator, axis, intermittency, backing_axis, backing_dir, node, param2)
+	local area = self.area
+	local data = self.data
+	local data_param2 = self.data_param2
+	local locked_indices = self.locked_indices
+	for pi in iterator do
+		if not locked_indices[pi] then
+			local pos = area:position(pi)
+			if pos[axis] % intermittency == 0 then
+				pos[backing_axis] = pos[backing_axis] + backing_dir
+				if not area:containsp(pos) or provides_support(data[area:indexp(pos)]) then
+					data[pi] = node
+					data_param2[pi] = param2
+					locked_indices[pi] = true
+				end
+			end
+		end
+	end
+end
+
+
 function deep_roads.Context:draw_torches(path1, path2, width_axis, length_axis, tunnel_def)
 	local torch1 = vector.new(path1)
 	local torch2 = vector.new(path2)
@@ -378,6 +365,10 @@ function deep_roads.Context:draw_torches(path1, path2, width_axis, length_axis, 
 		end
 	end		
 end
+
+
+-----------------------------------------------------------------------------
+-- Trench and liquid
 
 function deep_roads.Context:draw_trench(path1, path2, width_axis, tunnel_def)
 	local displace = tunnel_def.width
@@ -438,6 +429,9 @@ function deep_roads.Context:draw_liquid(path1, path2, width_axis, tunnel_def)
 	end
 end
 
+------------------------------------------------------------------------------------
+-- Rail
+
 function deep_roads.Context:draw_rail(path1, path2, length_axis, tunnel_def)
 	intersectmin, intersectmax = intersect(path1, path2, self.chunk_min, self.chunk_max)
 	if intersectmin ~= nil then
@@ -455,6 +449,29 @@ function deep_roads.Context:draw_rail(path1, path2, length_axis, tunnel_def)
 				locked_indices[pi] = true
 			end
 		end
+	end
+end
+
+
+--------------------------------------------------------------------------------------
+-- Base tunnel drawing code
+
+-- from_dir leaves the wall on that side open
+--TODO: all the detail work (wall material, bridge, trench, etc)
+function deep_roads.Context:drawcorner(pos, tunnel_def, from_dir)
+	local corner1 = vector.new(pos.x - tunnel_def.width, pos.y, pos.z - tunnel_def.width)
+	local corner2 = vector.new(pos.x + tunnel_def.width, pos.y + tunnel_def.height - 1, pos.z + tunnel_def.width)
+		
+	intersectmin, intersectmax = intersect(corner1, corner2, self.chunk_min, self.chunk_max)
+	local locked_indices = self.locked_indices
+	local data = self.data
+	
+	if intersectmin ~= nil then
+		for pi in self.area:iterp(intersectmin, intersectmax) do
+			if not locked_indices[pi] then
+				data[pi] = c_air
+			end
+		end		
 	end
 end
 
@@ -657,25 +674,8 @@ function deep_roads.Context:drawy(pos1, pos2, tunnel_def)
 	end
 end
 
-function deep_roads.Context:carve_intersection(point)
-
-	local radius = math.floor(point.val*(point.def.max_radius-point.def.min_radius)+ point.def.min_radius)
-	
-	local corner1 = {x=point.x - radius, y= point.y, z=point.z - radius}
-	local corner2 = {x=point.x + radius, y= point.y+3, z=point.z + radius}
-	local chunk_min = self.chunk_min
-	local chunk_max = self.chunk_max
-	local area = self.area
-	local data = self.data
-	
-	intersectmin, intersectmax = intersect(corner1, corner2, chunk_min, chunk_max)
-	if intersectmin ~= nil then
-		for pi in area:iterp(intersectmin, intersectmax) do
-			data[pi] = c_air
-		end
-		self:place_sign_on_post(point, "Welcome to " .. deep_roads.random_name(point.val))
-	end
-end
+---------------------------------------------------------------------------
+-- Recursive master tunnel drawing function
 
 local draw_tunnel_segment -- initial declaration to allow recursion
 function deep_roads.Context:draw_tunnel_segment(source, destination, tunnel_def, prev_dir)
@@ -689,9 +689,7 @@ function deep_roads.Context:draw_tunnel_segment(source, destination, tunnel_def,
 	local width = tunnel_def.width
 
 	local diff = vector.subtract(destination, source)
-	local dir_x = get_sign(diff.x)
-	local dir_y = get_sign(diff.y)
-	local dir_z = get_sign(diff.z)
+	local dir = vector.new(get_sign(diff.x), get_sign(diff.y), get_sign(diff.z))
 
 	local change_y
 	if source.y == destination.y then
@@ -702,25 +700,27 @@ function deep_roads.Context:draw_tunnel_segment(source, destination, tunnel_def,
 		change_y = math.random() > 0.5
 	end
 	
-	local change_x
+	local change_axis
 	if source.x == destination.x then
-		change_x = false
+		change_axis = "z"
 	elseif source.z == destination.z then
-		change_x = true
+		change_axis = "x"
+	elseif math.random() > 0.5 then
+		change_axis = "x"
 	else
-		change_x = math.random() > 0.5
+		change_axis = "z"
 	end
 	
 	local next_location
 
 	--we may need to jink to the side to avoid retracing previous steps
 	if prev_dir then
-		if change_x and ((prev_dir.x < 0 and dir_x > 0) or (prev_dir.x > 0 and dir_x < 0)) then
+		if change_axis == "x" and ((prev_dir.x < 0 and dir.x > 0) or (prev_dir.x > 0 and dir.x < 0)) then
 			next_location = vector.new(source.x, source.y, source.z + (width*2+2)*random_sign())
 			self:drawxz(source, next_location, tunnel_def)
 			if not vector.equals(destination, next_location) then self:drawcorner(next_location, tunnel_def, nil) end
 			source = vector.new(next_location)
-		elseif (not change_x) and ((prev_dir.z < 0 and dir_z > 0) or (prev_dir.z > 0 and dir_z < 0)) then
+		elseif change_axis == "z" and ((prev_dir.z < 0 and dir.z > 0) or (prev_dir.z > 0 and dir.z < 0)) then
 			next_location = vector.new(source.x + (width*2+2)*random_sign(), source.y, source.z)
 			self:drawxz(source, next_location, tunnel_def)
 			if not vector.equals(destination, next_location) then self:drawcorner(next_location, tunnel_def, nil) end
@@ -729,54 +729,35 @@ function deep_roads.Context:draw_tunnel_segment(source, destination, tunnel_def,
 	end
 	
 	if not change_y then
-		if change_x then
-			local dist = math.min(math.random(10, 1000), math.abs(diff.x)) * dir_x
-			next_location = vector.new(source.x+dist, source.y, source.z)
-			self:drawxz(source, next_location, tunnel_def)
-		else
-			local dist = math.min(math.random(10, 1000), math.abs(diff.z)) * dir_z
-			next_location = vector.new(source.x, source.y, source.z+dist)
-			self:drawxz(source, next_location, tunnel_def)
-		end
+		local dist = math.min(math.random(10, 1000), math.abs(diff[change_axis])) * dir[change_axis]
+		next_location = vector.new(source.x, source.y, source.z)
+		next_location[change_axis] = next_location[change_axis] + dist
+		self:drawxz(source, next_location, tunnel_def)
+
 		if not vector.equals(destination, next_location) then self:drawcorner(next_location, tunnel_def, nil) end
 	else
-		--TODO: lots of repeated code here, need to refactor
-		local slope = tunnel_def.slope
-		if change_x then
-			if prev_dir and not ((prev_dir.x > 0 and dir_x > 0) or (prev_dir.x < 0 and dir_x < 0)) then
-				-- if we're changing direction first go width nodes in this direction to make the corner nicer.
-				next_location = vector.new(source.x + width*dir_x, source.y, source.z)
-				self:drawxz(source, next_location, tunnel_def) -- needed to ensure rail continuity
-				if not vector.equals(destination, next_location) then self:drawcorner(source, tunnel_def, nil) end
-				source = vector.new(next_location)
-			end
-			-- then do the sloped part
-			local dist = math.min(math.random(10, 1000), math.abs(diff.y))
-			next_location = vector.new(source.x+(dist*dir_x), source.y+(dist*dir_y), source.z)
-			self:drawy(source, next_location, tunnel_def)
-			source = vector.new(next_location)
-			-- then the last bit to make the bottom nicer
-			next_location = vector.new(source.x + width*dir_x, source.y, source.z)
+		local slope = tunnel_def.slope -- TODO
+		
+		if prev_dir and not ((prev_dir[change_axis] > 0 and dir[change_axis] > 0) or (prev_dir[change_axis] < 0 and dir[change_axis] < 0)) then
+			-- if we're changing direction first go width nodes in this direction to make the corner nicer.
+			next_location = vector.new(source.x, source.y, source.z)
+			next_location[change_axis] = next_location[change_axis] + width*dir[change_axis]
 			self:drawxz(source, next_location, tunnel_def) -- needed to ensure rail continuity
 			if not vector.equals(destination, next_location) then self:drawcorner(source, tunnel_def, nil) end
-		else
-			if prev_dir and not ((prev_dir.z > 0 and dir_z > 0) or (prev_dir.z < 0 and dir_z < 0)) then
-				-- if we're changing direction first go width nodes in this direction to make the corner nicer
-				next_location = vector.new(source.x, source.y, source.z + width*dir_z)
-				self:drawxz(source, next_location, tunnel_def) -- needed to ensure rail continuity
-				if not vector.equals(destination, next_location) then self:drawcorner(source, tunnel_def, nil) end
-				source = vector.new(next_location)
-			end
-			-- then do the sloped part
-			local dist = math.min(math.random(10, 1000), math.abs(diff.y))
-			next_location = vector.new(source.x, source.y+(dist*dir_y), source.z+(dist*dir_z))
-			self:drawy(source, next_location, tunnel_def)
 			source = vector.new(next_location)
-			-- then the last bit to make the bottom nicer
-			next_location = vector.new(source.x, source.y, source.z + width*dir_z)
-			self:drawxz(source, next_location, tunnel_def) -- needed to ensure rail continuity
-			if not vector.equals(destination, next_location) then self:drawcorner(source, tunnel_def, nil) end
 		end
+		-- then do the sloped part
+		local dist = math.min(math.random(10, 1000), math.abs(diff.y))
+		next_location = vector.new(source.x, source.y+(dist*dir.y), source.z)
+		next_location[change_axis] = next_location[change_axis] + dist*dir[change_axis]
+		self:drawy(source, next_location, tunnel_def)
+		source = vector.new(next_location)
+		-- then the last bit to make the bottom nicer
+		next_location = vector.new(source.x, source.y, source.z)
+		next_location[change_axis] = next_location[change_axis] + width*dir[change_axis]			
+		self:drawxz(source, next_location, tunnel_def) -- needed to ensure rail continuity
+		if not vector.equals(destination, next_location) then self:drawcorner(source, tunnel_def, nil) end
+
 	end
 	prev_dir = vector.subtract(next_location, source)
 	self:draw_tunnel_segment(next_location, destination, tunnel_def, prev_dir)
@@ -790,6 +771,9 @@ function deep_roads.Context:segmentize_connection(connection)
 	
 	self:draw_tunnel_segment(connection.pt1, connection.pt2, connection.def, nil)
 end
+
+--------------------------------------------------------------------
+-- Signs
 
 function deep_roads.Context:place_sign(pos, name, param2)
 	local area = self.area
@@ -861,5 +845,28 @@ function deep_roads.Context:place_sign_on_ceiling(posparam, name, height)
 			meta:set_string("infotext", '"' .. name .. '"')
 			meta:set_string("text", name)
 		end
+	end
+end
+
+--------------------------------------------------------------------------
+-- Intersection
+
+function deep_roads.Context:carve_intersection(point)
+
+	local radius = math.floor(point.val*(point.def.max_radius-point.def.min_radius)+ point.def.min_radius)
+	
+	local corner1 = {x=point.x - radius, y= point.y, z=point.z - radius}
+	local corner2 = {x=point.x + radius, y= point.y+3, z=point.z + radius}
+	local chunk_min = self.chunk_min
+	local chunk_max = self.chunk_max
+	local area = self.area
+	local data = self.data
+	
+	intersectmin, intersectmax = intersect(corner1, corner2, chunk_min, chunk_max)
+	if intersectmin ~= nil then
+		for pi in area:iterp(intersectmin, intersectmax) do
+			data[pi] = c_air
+		end
+		self:place_sign_on_post(point, "Welcome to " .. deep_roads.random_name(point.val))
 	end
 end

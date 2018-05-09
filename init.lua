@@ -6,7 +6,7 @@ local modpath = minetest.get_modpath(minetest.get_current_modname())
 dofile(modpath.."/functions.lua") --function definitions
 
 local gridscale = {x=1000, y=200, z=1000}
-local ymin = -2000
+local ymin = -2300
 local ymax = -10
 local connection_probability = 0.75
 
