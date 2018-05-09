@@ -229,7 +229,7 @@ local intersect = function(minpos1, maxpos1, minpos2, maxpos2)
 end
 
 local provides_support = function(node)
-	if not (node == c_air or node == c_water or node == c_lava) then
+	if not deep_roads.buildable_to[node] then
 		return true
 	end
 	return false
@@ -476,7 +476,10 @@ function deep_roads.Context:drawcorner(pos, tunnel_def, from_dir)
 end
 
 -- Draws a horizontal tunnel from pos1 to pos2.
-function deep_roads.Context:drawxz(pos1, pos2, tunnel_def)
+function deep_roads.Context:drawxz(pos1, direction, distance, tunnel_def)
+	local pos2 = vector.new(pos1)
+	pos2[direction] = pos2[direction] + distance
+
 	local locked_indices = self.locked_indices
 	local data = self.data
 	local data_param2 = self.data_param2
@@ -495,7 +498,7 @@ function deep_roads.Context:drawxz(pos1, pos2, tunnel_def)
 
 	local length_axis
 	local width_axis
-	if corner1.x == corner2.x then
+	if direction == "z" then
 		length_axis = "z"
 		width_axis = "x"
 	else
@@ -576,6 +579,8 @@ function deep_roads.Context:drawxz(pos1, pos2, tunnel_def)
 		wall2[width_axis] = wall2[width_axis] + 2*displace+2
 		self:modify_slab(wall1, wall2, tunnel_def, wall_block, seal_air_material, seal_water_material, seal_lava_material)
 	end
+	
+	return pos2
 end
 
 local vertical_power_spacing = 1
@@ -715,14 +720,13 @@ function deep_roads.Context:draw_tunnel_segment(source, destination, tunnel_def,
 
 	--we may need to jink to the side to avoid retracing previous steps
 	if prev_dir then
+		local distance = (width*2+2)*random_sign()
 		if change_axis == "x" and ((prev_dir.x < 0 and dir.x > 0) or (prev_dir.x > 0 and dir.x < 0)) then
-			next_location = vector.new(source.x, source.y, source.z + (width*2+2)*random_sign())
-			self:drawxz(source, next_location, tunnel_def)
+			next_location = self:drawxz(source, "z", distance, tunnel_def)
 			if not vector.equals(destination, next_location) then self:drawcorner(next_location, tunnel_def, nil) end
 			source = vector.new(next_location)
 		elseif change_axis == "z" and ((prev_dir.z < 0 and dir.z > 0) or (prev_dir.z > 0 and dir.z < 0)) then
-			next_location = vector.new(source.x + (width*2+2)*random_sign(), source.y, source.z)
-			self:drawxz(source, next_location, tunnel_def)
+			next_location = self:drawxz(source, "x", distance, tunnel_def)
 			if not vector.equals(destination, next_location) then self:drawcorner(next_location, tunnel_def, nil) end
 			source = vector.new(next_location)
 		end
@@ -730,9 +734,7 @@ function deep_roads.Context:draw_tunnel_segment(source, destination, tunnel_def,
 	
 	if not change_y then
 		local dist = math.min(math.random(10, 1000), math.abs(diff[change_axis])) * dir[change_axis]
-		next_location = vector.new(source.x, source.y, source.z)
-		next_location[change_axis] = next_location[change_axis] + dist
-		self:drawxz(source, next_location, tunnel_def)
+		next_location = self:drawxz(source, change_axis, dist, tunnel_def)
 
 		if not vector.equals(destination, next_location) then self:drawcorner(next_location, tunnel_def, nil) end
 	else
@@ -740,9 +742,8 @@ function deep_roads.Context:draw_tunnel_segment(source, destination, tunnel_def,
 		
 		if prev_dir and not ((prev_dir[change_axis] > 0 and dir[change_axis] > 0) or (prev_dir[change_axis] < 0 and dir[change_axis] < 0)) then
 			-- if we're changing direction first go width nodes in this direction to make the corner nicer.
-			next_location = vector.new(source.x, source.y, source.z)
-			next_location[change_axis] = next_location[change_axis] + width*dir[change_axis]
-			self:drawxz(source, next_location, tunnel_def) -- needed to ensure rail continuity
+			local distance = width*dir[change_axis]
+			next_location = self:drawxz(source, change_axis, distance, tunnel_def) -- needed to ensure rail continuity
 			if not vector.equals(destination, next_location) then self:drawcorner(source, tunnel_def, nil) end
 			source = vector.new(next_location)
 		end
@@ -753,9 +754,8 @@ function deep_roads.Context:draw_tunnel_segment(source, destination, tunnel_def,
 		self:drawy(source, next_location, tunnel_def)
 		source = vector.new(next_location)
 		-- then the last bit to make the bottom nicer
-		next_location = vector.new(source.x, source.y, source.z)
-		next_location[change_axis] = next_location[change_axis] + width*dir[change_axis]			
-		self:drawxz(source, next_location, tunnel_def) -- needed to ensure rail continuity
+		local distance = width*dir[change_axis]
+		next_location = self:drawxz(source, change_axis, distance, tunnel_def) -- needed to ensure rail continuity
 		if not vector.equals(destination, next_location) then self:drawcorner(source, tunnel_def, nil) end
 
 	end

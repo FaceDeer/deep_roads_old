@@ -3,6 +3,17 @@ deep_roads = {} --create a container for functions and constants
 --grab a shorthand for the filepath of the mod
 local modpath = minetest.get_modpath(minetest.get_current_modname())
 
+deep_roads.buildable_to = {}
+
+minetest.after(0, function()
+	for name, def in pairs(minetest.registered_nodes) do
+		if def.buildable_to then
+			deep_roads.buildable_to[minetest.get_content_id(name)] = true
+		end
+	end
+end)
+
+
 dofile(modpath.."/functions.lua") --function definitions
 
 local gridscale = {x=1000, y=200, z=1000}
