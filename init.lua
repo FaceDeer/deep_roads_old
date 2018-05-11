@@ -5,6 +5,8 @@ local modpath = minetest.get_modpath(minetest.get_current_modname())
 
 deep_roads.buildable_to = {}
 
+-- As soon as the server fires up, build a list of all registered buildable_to nodes.
+-- By using minetest.after we don't have to worry about the order in which mods are initialized
 minetest.after(0, function()
 	for name, def in pairs(minetest.registered_nodes) do
 		if def.buildable_to then
