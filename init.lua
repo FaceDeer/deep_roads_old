@@ -56,6 +56,9 @@ local tunnel_def =
 	--width = 2,
 	--height = 4,
 	
+	landing_length = 3,
+	stair_length = 14,
+	
 }
 local narrow_tunnel = 
 {

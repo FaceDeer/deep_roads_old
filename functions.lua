@@ -43,7 +43,8 @@ local default_tunnel_def =
 	floor_block = nil, -- when non-nil, replaces floor with this block type. Does not bridge air gaps.
 	wall_block = nil, -- when non-nil, replaces walls with this block type
 	ceiling_block = nil, -- when non-nil, replaces ceiling with this block type
-	slope = 2,
+	landing_length = 0, -- when non-zero, a landing this many blocks long will be placed every stair_length interval
+	stair_length = 1, -- interval between landings
 	seal_lava_material = nil, -- replace lava blocks in walls with this material
 	seal_water_material = nil, -- replace water blocks in walls with this material
 	seal_air_material = nil, -- patch holes in walls and ceilings with this material. Use bridge material for patching floors.
@@ -480,7 +481,7 @@ function deep_roads.Context:drawxz(pos1, direction, distance, tunnel_def)
 	--minetest.debug("Draw XZ params: " .. minetest.pos_to_string(pos1) .. ", " .. direction  .. ", " .. tostring(distance))
 
 	local pos2 = vector.new(pos1)
-	pos2[direction] = pos2[direction] + distance
+	pos2[direction] = pos2[direction] + distance - get_sign(distance)
 
 	local locked_indices = self.locked_indices
 	local data = self.data
@@ -586,14 +587,39 @@ function deep_roads.Context:drawxz(pos1, direction, distance, tunnel_def)
 	return pos2
 end
 
-local vertical_power_spacing = 1
+local landings_between = function (y1, y2, interval)
+	-- The trivial case first.
+--	if y1 == y2 then
+--		if y1 % interval == 0 then return 1 else return 0 end
+--	end
+	
+	local absy1 = math.abs(y1)
+	local absy2 = math.abs(y2)
+	
+	if get_sign(y1) ~= get_sign(y2) then
+		-- The staircase crosses the 0 line. Add the two. Subtract 1 because of the duplicate landing at 0.
+		return math.floor(absy1/interval) + math.floor(absy2/interval) - 1
+	else
+		local maxy = math.max(absy1, absy2)
+		local miny = math.min(absy1, absy2)
+		-- imagine the stair runs from 20 to 300. find the number of landings between 0 and 300 and subtract the number of landings between 0 and 19.
+		return math.floor(maxy/interval) - math.floor((miny-1)/interval)
+	end
+end
 
---Draw a sloped tunnel from pos1 to pos2. Assumes 45 degree slope and aligned to x or z axis.
-function deep_roads.Context:drawy(pos1, direction, distance, rise, tunnel_def)
-	--minetest.debug("Draw Y params: " .. minetest.pos_to_string(pos1) .. ", " .. direction  .. ", " .. tostring(distance) .. ", " .. tostring(rise))
+function deep_roads.Context:drawy(pos1, direction_axis, distance, rise, tunnel_def)
+	--minetest.debug("Draw Y params: " .. minetest.pos_to_string(pos1) .. ", " .. direction_axis  .. ", " .. tostring(distance) .. ", " .. tostring(rise))
+
+	local landing_length = tunnel_def.landing_length
+	local stair_length = tunnel_def.stair_length
+	
+	local y_dir = get_sign(rise)
+	local landings
+	if landing_length > 0 then landings = landings_between(pos1.y, pos1.y+rise-y_dir, stair_length) else landings = 0 end
+	local dir = get_sign(distance)
 
 	local pos2 = vector.new(pos1)
-	pos2[direction] = pos2[direction] + distance
+	pos2[direction_axis] = pos2[direction_axis] + dir*(math.abs(rise) + landings*landing_length)
 	pos2.y = pos2.y + rise
 
 	local corner1 = {x = math.min(pos1.x, pos2.x), y = math.min(pos1.y, pos2.y), z = math.min(pos1.z, pos2.z)}
@@ -601,95 +627,26 @@ function deep_roads.Context:drawy(pos1, direction, distance, rise, tunnel_def)
 	
 	local chunk_min = self.chunk_min
 	local chunk_max = self.chunk_max
-	local data = self.data
-	local area = self.area
-	local locked_indices = self.locked_indices
-	
-	local bridge_block = tunnel_def.bridge_block
-	
-	local displace = tunnel_def.width
-	local height = tunnel_def.height
-	local add_rail = tunnel_def.rail
-	
-	local length_axis
-	local width_axis
-	if pos1.x == pos2.x then
-		--drawing z-direction slope, widen along the x axis
-		length_axis = "z"
-		width_axis = "x"
-	else
-		--drawing x-direction slope
-		length_axis = "x"
-		width_axis = "z"
-	end
-	corner1[width_axis] = corner1[width_axis] - displace
-	corner2[width_axis] = corner2[width_axis] + displace
-	
+		
+	local counted_landings = 0
 	intersectmin, intersectmax = intersect(corner1, corner2, chunk_min, chunk_max) -- Check bounding box of overall ramp corridor
 	if intersectmin ~= nil then
 	
-		local y_dist = pos2.y - pos1.y
-		local y_dir
-		if y_dist > 0 then y_dir = 1 else y_dir = -1 end
-		local length_dist = pos2[length_axis] - pos1[length_axis]
-		local length_dir = get_sign(length_dist)
-	
-		local current1 = vector.new(pos1)
-		current1[width_axis] = current1[width_axis] - displace
-		local current2 = vector.new(pos1)
-		current2[width_axis] = current2[width_axis] + displace
-		local midpoint = vector.new(pos1)
+		local current_location = vector.new(pos1)
 		
-		for i = 0, math.abs(length_dist) do
-			current1.y = pos1.y + i * y_dir
-			midpoint.y = current1.y
-			current2.y = pos1.y + i * y_dir + height -- TODO: omit this +1 for the highest point in the run, that will remove the hole in the ceiling
-			current1[length_axis] = pos1[length_axis] + i * length_dir
-			current2[length_axis] = current1[length_axis]
-			midpoint[length_axis] = current1[length_axis]
-			
-			intersectmin, intersectmax = intersect(current1, current2, chunk_min, chunk_max)
-			if intersectmin ~= nil then
-				for pi in area:iterp(intersectmin, intersectmax) do
-					if not locked_indices[pi] then
-						data[pi] = c_air
-					end
-				end
-				
-				if add_rail then
-					local railnode = c_rail
-					if midpoint.y % vertical_power_spacing == 0 then
-						railnode = c_powerrail
-					end
-				
-					if area:containsp(midpoint) then
-						local pi = area:indexp(midpoint)
-						data[pi] = railnode
-						locked_indices[pi] = true
-					end
-				end
-				
-				if bridge_block then
-					intersectmin, intersectmax = intersect(
-						vector.new(midpoint.x, midpoint.y-2, midpoint.z),
-						vector.new(midpoint.x, midpoint.y-1, midpoint.z),
-						chunk_min, chunk_max)
-					if intersectmin ~= nil then
-						for pi in area:iterp(intersectmin, intersectmax) do
-							if data[pi] == c_air then
-								data[pi] = bridge_block
-								locked_indices[pi] = true
-							end
-						end
-					end
-				end
+		while current_location.y ~= pos2.y do
+			if landing_length > 0 and current_location.y % stair_length == 0 then
+				counted_landings = counted_landings + 1
+				current_location = self:drawxz(current_location, direction_axis, landing_length*dir, tunnel_def)
 			end
+			current_location.y = current_location.y + y_dir
+			current_location = self:drawxz(current_location, direction_axis, dir, tunnel_def) --TODO: "riser" form
 		end
 	end
 	
-	pos2[direction] = pos2[direction] + get_sign(distance)
 	return pos2
 end
+
 
 ---------------------------------------------------------------------------
 -- Recursive master tunnel drawing function

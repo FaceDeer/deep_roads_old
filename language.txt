@@ -8,6 +8,7 @@ accident
 ace
 ache
 acrid
+acropolis
 act
 action
 admiration
@@ -15,6 +16,7 @@ admire
 adore
 adulate
 adventure
+aegis
 affection
 afflict
 after
@@ -106,6 +108,7 @@ basalt
 basement
 basic
 basin
+bastille
 bastion
 bat
 bath
@@ -243,6 +246,7 @@ bunion
 bunny
 burden
 burn
+burrow
 burst
 bury
 bush
@@ -254,6 +258,7 @@ butcher
 butter
 butterfly
 button
+buttress
 buzzard
 cabinet
 cackle
@@ -310,6 +315,7 @@ charm
 chartreuse
 chasm
 chastity
+chateau
 cheer
 cheerful
 cheese
@@ -516,6 +522,7 @@ decide
 decisive
 decline
 deep
+deepness
 deer
 defect
 defend
@@ -525,6 +532,7 @@ defiant
 deity
 delight
 dell
+delve
 demon
 den
 denomination
@@ -547,6 +555,7 @@ devil
 devious
 devourer
 diamond
+dig
 dignity
 dike
 dim
@@ -589,6 +598,7 @@ domain
 domestic
 dominate
 dominion
+donjon
 donkey
 doom
 door
@@ -668,6 +678,7 @@ equity
 equivalence
 erase
 escort
+estate
 esteem
 eternal
 euphoria
@@ -681,6 +692,7 @@ eviscerate
 evisceration
 exalt
 excavate
+excavation
 execute
 executioner
 exit
@@ -705,6 +717,7 @@ fancyverb
 fang
 farm
 fasten
+fastness
 fat
 fatal
 fate
@@ -821,6 +834,7 @@ garish
 garlic
 garnet
 garnish
+garrison
 gate
 gaunt
 gaze
@@ -874,6 +888,7 @@ good
 goose
 gore
 gorge
+gouge
 grain
 grand
 granite
@@ -1087,6 +1102,7 @@ jump
 jungle
 just
 justify
+keep
 keeper
 keg
 kelp
@@ -1426,9 +1442,11 @@ pantomime
 pants
 paper
 papyrus
+parapet
 parch
 parchment
 parity
+partition
 partner
 pass
 passage
@@ -1492,6 +1510,7 @@ plum
 plump
 plunge
 pocket
+pod
 poem
 poet
 poetry
@@ -1553,6 +1572,7 @@ puzzle
 pyrite
 quake
 quandary
+quarry
 quartz
 queen
 quest
@@ -1596,6 +1616,7 @@ reason
 recluse
 recreation
 red
+redoubt
 regal
 reign
 rein
@@ -1669,6 +1690,7 @@ sack
 sacrifice
 sad
 safe
+safehold
 saffron
 sag
 saint
@@ -1781,6 +1803,7 @@ sickness
 side
 siege
 sienna
+sift
 sign
 silence
 silk
@@ -1865,6 +1888,7 @@ soul
 sound
 sour
 south
+spade
 spark
 sparkle
 spasm
@@ -1928,6 +1952,7 @@ star
 start
 starve
 stasis
+station
 steal
 steam
 steed
@@ -1961,6 +1986,7 @@ strife
 strike
 string
 stroke
+stronghold
 stump
 stunt
 stunted
@@ -2198,6 +2224,7 @@ vice
 victim
 vigor
 vile
+villa
 village
 vine
 viola
