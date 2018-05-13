@@ -15,10 +15,9 @@ minetest.after(0, function()
 	end
 end)
 
-
 dofile(modpath.."/functions.lua") --function definitions
 
-local gridscale = {x=1000, y=200, z=1000}
+local gridscale = {x=500, y=200, z=500}
 local ymin = -2300
 local ymax = -10
 local connection_probability = 0.75
@@ -50,6 +49,8 @@ local tunnel_def =
 	
 	--wall_block = c_stonebrick,
 	--ceiling_block = c_stonebrick,
+	
+	stair_block = c_stonebrickstair,
 	
 	torch_spacing = 8,
 	torch_height = 2,

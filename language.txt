@@ -1,4 +1,3 @@
-abate
 abbey
 absolute
 abysmal
@@ -1637,6 +1636,7 @@ reward
 rhyme
 rhyolite
 rhythm
+ribbon
 riddle
 rider
 rift
