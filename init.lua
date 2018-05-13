@@ -3,6 +3,9 @@ deep_roads = {} --create a container for functions and constants
 --grab a shorthand for the filepath of the mod
 local modpath = minetest.get_modpath(minetest.get_current_modname())
 
+dofile(modpath.."/functions.lua") --function definitions
+dofile(modpath.."/config.lua")
+
 deep_roads.buildable_to = {}
 
 -- As soon as the server fires up, build a list of all registered buildable_to nodes.
@@ -15,11 +18,9 @@ minetest.after(0, function()
 	end
 end)
 
-dofile(modpath.."/functions.lua") --function definitions
-
-local gridscale = {x=500, y=200, z=500}
-local ymin = -2300
-local ymax = -10
+local gridscale = {x=deep_roads.config.gridscale_xz, y=deep_roads.config.gridscale_y, z=deep_roads.config.gridscale_xz}
+local ymin = deep_roads.config.y_min
+local ymax = deep_roads.config.y_max
 local connection_probability = 0.75
 
 local data = {}

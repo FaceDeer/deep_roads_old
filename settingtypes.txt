@@ -1,0 +1,10 @@
+#The scale of the grid used to lay out intersections on the X and Z axes
+deep_roads_gridscale_xz (X/Z grid scale) int 500 100 10000
+#The scale of the grid used to lay out intersections on the Y axis
+deep_roads_gridscale_y (Y grid scale) int 200 100 10000
+
+
+#The scale of the grid used to lay out intersections on the Y axis
+deep_roads_y_min (Y minimum) int -2300 -60000 60000
+#The scale of the grid used to lay out intersections on the Y axis
+deep_roads_y_max (Y maximum) int -10 -60000 60000
