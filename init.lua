@@ -70,12 +70,15 @@ local narrow_tunnel =
 local sewer_def =
 {
 	trench_block = c_stonebrick,
+	stair_block = c_stonebrickstair,
 	floor_block = c_stonebrick,
 	liquid_block = c_water,
 	bridge_block = c_stonebrick,
 	bridge_width = 1,
 	torch_spacing = 16,
 	torch_height = 3,
+	landing_length = 2,
+	stair_length = 1,
 }
 
 local intersection_def =
@@ -134,6 +137,7 @@ minetest.register_on_generated(function(minp, maxp, seed)
 --	--calc lighting
 	vm:set_lighting({day = 0, night = 0})
 	vm:calc_lighting()
+	vm:update_liquids()
 --	--write it to world
 	vm:write_to_map()
 

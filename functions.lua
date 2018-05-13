@@ -370,9 +370,10 @@ end
 -----------------------------------------------------------------------------
 -- Trench and liquid
 
-function deep_roads.Context:draw_trench(path1, path2, width_axis, tunnel_def)
-	local displace = tunnel_def.width
+-- also used for putting stairs on top of trench blocks, when param2 is defined
+function deep_roads.Context:draw_trench(path1, path2, width_axis, trench_block, displace, param2)
 	local data = self.data
+	local data_param2 = self.data_param2
 	local locked_indices = self.locked_indices
 	local area = self.area
 	
@@ -386,6 +387,9 @@ function deep_roads.Context:draw_trench(path1, path2, width_axis, tunnel_def)
 		for pi in area:iterp(intersectmin, intersectmax) do
 			if not locked_indices[pi] then
 				data[pi] = trench_block
+				if param2 ~= nil then
+					data_param2[pi] = param2
+				end
 			end
 		end				
 	end			
@@ -396,6 +400,9 @@ function deep_roads.Context:draw_trench(path1, path2, width_axis, tunnel_def)
 		for pi in area:iterp(intersectmin, intersectmax) do
 			if not locked_indices[pi] then
 				data[pi] = trench_block
+				if param2 ~= nil then
+					data_param2[pi] = param2
+				end
 			end
 		end	
 	end
@@ -484,7 +491,9 @@ function deep_roads.Context:draw_stairs(path1, path2, width_axis, tunnel_def, di
 	local stairside1 = vector.new(path1)
 	local stairside2 = vector.new(path2)
 	if trench_block then
-		--TODO
+		stairside1.y = stairside1.y + 1
+		stairside2.y = stairside2.y + 1
+		self:draw_trench(stairside1, stairside2, width_axis, stair_block, displace, param2)
 	else
 		stairside1[width_axis] = stairside1[width_axis]-displace
 		stairside2[width_axis] = stairside2[width_axis]+displace
@@ -586,12 +595,11 @@ function deep_roads.Context:drawxz(pos1, direction, distance, tunnel_def, rise_d
 			self:draw_torches(path1, path2, width_axis, length_axis, tunnel_def)
 		end
 		
-		-- If there's a trench block defined, put it on the sides of the tunnel
-		if tunnel_def.trench_block and displace > 0 and corner2[length_axis]-corner1[length_axis] > displace*2 then
-			self:draw_trench(path1, path2, width_axis, tunnel_def)
+		if tunnel_def.trench_block and displace > 0 then --and corner2[length_axis]-corner1[length_axis] > displace*2 then
+			self:draw_trench(path1, path2, width_axis, tunnel_def.trench_block, tunnel_def.width)
 		end
 		
-		if tunnel_def.liquid_block then
+		if tunnel_def.liquid_block and rise_dir == nil then
 			self:draw_liquid(path1, path2, width_axis, tunnel_def)
 		end
 	end
