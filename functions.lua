@@ -642,11 +642,6 @@ function deep_roads.Context:drawxz(pos1, direction, distance, tunnel_def, rise_d
 end
 
 local landings_between = function (y1, y2, interval)
-	-- The trivial case first.
---	if y1 == y2 then
---		if y1 % interval == 0 then return 1 else return 0 end
---	end
-	
 	local absy1 = math.abs(y1)
 	local absy2 = math.abs(y2)
 	
@@ -669,7 +664,7 @@ function deep_roads.Context:drawy(pos1, direction_axis, distance, rise, tunnel_d
 	
 	local y_dir = get_sign(rise)
 	local landings
-	if landing_length > 0 then landings = landings_between(pos1.y, pos1.y+rise-y_dir, stair_length) else landings = 0 end
+	if landing_length > 0 then landings = landings_between(pos1.y, pos1.y+rise, stair_length) else landings = 0 end
 	local dir = get_sign(distance)
 
 	local pos2 = vector.new(pos1)
@@ -682,35 +677,32 @@ function deep_roads.Context:drawy(pos1, direction_axis, distance, rise, tunnel_d
 	local chunk_min = self.chunk_min
 	local chunk_max = self.chunk_max
 		
-	--local counted_landings = 0
 	intersectmin, intersectmax = intersect(corner1, corner2, chunk_min, chunk_max) -- Check bounding box of overall ramp corridor
 	if intersectmin ~= nil then
+	
+		local top_y
+		if y_dir < 0 then top_y = pos1.y else top_y = pos2.y end
+		
+		local counted_landings = 0
 		local current_location = vector.new(pos1)
 		while current_location.y ~= pos2.y do
-			current_location.y = current_location.y + y_dir
 			if y_dir < 0 then
-				-- going down. draw stairs then draw landing
-				if current_location.y == pos1.y then -- extra check to prevent drawing a stair at the top level when we don't want to go any farther up.
-					current_location = self:drawxz(current_location, direction_axis, dir, tunnel_def)
-				else
-					current_location = self:drawxz(current_location, direction_axis, dir, tunnel_def, y_dir)
-				end
+				-- going down. move, then draw stairs, then draw landing
+				current_location.y = current_location.y + y_dir
+				current_location = self:drawxz(current_location, direction_axis, dir, tunnel_def, y_dir)
 				if landing_length > 0 and current_location.y % stair_length == 0 then
-					--counted_landings = counted_landings + 1
+					counted_landings = counted_landings + 1
 					current_location = self:drawxz(current_location, direction_axis, landing_length*dir, tunnel_def)
 				end
 			end
 			if y_dir > 0 then
-				-- going up. draw landing then draw stairs
+				-- going up. draw landing then draw stairs then move
 				if landing_length > 0 and current_location.y % stair_length == 0 then
-					--counted_landings = counted_landings + 1
+					counted_landings = counted_landings + 1
 					current_location = self:drawxz(current_location, direction_axis, landing_length*dir, tunnel_def)
 				end
-				if current_location.y == pos2.y then -- extra check to prevent drawing a stair at the top level when we don't want to go any farther up.
-					current_location = self:drawxz(current_location, direction_axis, dir, tunnel_def)
-				else
-					current_location = self:drawxz(current_location, direction_axis, dir, tunnel_def, y_dir)
-				end
+				current_location = self:drawxz(current_location, direction_axis, dir, tunnel_def, y_dir)
+				current_location.y = current_location.y + y_dir
 			end
 		end
 		if not vector.equals(current_location, pos2) then
@@ -785,21 +777,15 @@ function deep_roads.Context:draw_tunnel_segment(source, destination, tunnel_def,
 		if distance_within(destination, next_location, tunnel_diameter+1) then return end
 		self:drawcorner(next_location, tunnel_def, nil)
 	else
-		local slope = tunnel_def.slope -- TODO
-		
-		--if prev_dir and not ((prev_dir[change_axis] > 0 and dir[change_axis] > 0) or (prev_dir[change_axis] < 0 and dir[change_axis] < 0)) then
-			-- if we're changing direction first go width nodes in this direction to make the corner nicer.
-			local distance = (width+1)*dir[change_axis]
-			next_location = self:drawxz(next_location, change_axis, distance, tunnel_def) -- needed to ensure rail continuity
-			if distance_within(destination, next_location, tunnel_diameter+1) then return end
-			--self:drawcorner(next_location, tunnel_def, nil)
-		--end
+		-- if we're changing direction first go width nodes in this direction to make the corner nicer.
+		local aglet_distance = (width+1)*dir[change_axis]
+		next_location = self:drawxz(next_location, change_axis, aglet_distance, tunnel_def)
+		if distance_within(destination, next_location, tunnel_diameter+1) then return end
 		-- then do the sloped part
 		local dist = math.min(math.random(10, 1000), math.abs(diff.y)) * dir[change_axis]
 		next_location = self:drawy(next_location, change_axis, dist, math.abs(dist)*dir.y, tunnel_def)
 		-- then the last bit to make the bottom nicer
-		local distance = width*dir[change_axis]
-		next_location = self:drawxz(next_location, change_axis, distance, tunnel_def) -- needed to ensure rail continuity
+		next_location = self:drawxz(next_location, change_axis, aglet_distance, tunnel_def)
 		if distance_within(destination, next_location, tunnel_diameter+1) then return end
 		self:drawcorner(next_location, tunnel_def, nil)
 
