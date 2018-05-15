@@ -576,6 +576,7 @@ function deep_roads.Context:drawxz(pos1, direction, distance, tunnel_def, rise_d
 	if intersectmin ~= nil then
 		--minetest.debug("drawing xz from "..minetest.pos_to_string(pos1) .. " to " .. minetest.pos_to_string(pos2))
 	
+		-- hollow out the tunnel
 		for pi in area:iterp(intersectmin, intersectmax) do
 			if not locked_indices[pi] then
 				data[pi] = c_air
@@ -608,8 +609,6 @@ function deep_roads.Context:drawxz(pos1, direction, distance, tunnel_def, rise_d
 	local seal_lava_material = tunnel_def.seal_lava_material
 	local seal_water_material = tunnel_def.seal_water_material
 	local seal_air_material = tunnel_def.seal_air_material
-	local bridge_support_spacing = tunnel_def.bridge_support_spacing
-	local bridge_support_block = tunnel_def.bridge_support_block
 	local ceiling_block = tunnel_def.ceiling_block
 	local wall_block = tunnel_def.wall_block
 	
@@ -646,6 +645,7 @@ function deep_roads.Context:drawxz(pos1, direction, distance, tunnel_def, rise_d
 	end
 	
 	pos2[direction] = pos2[direction] + get_sign(distance)
+	--minetest.debug("returning " .. minetest.pos_to_string(pos2))
 	return pos2
 end
 
@@ -713,11 +713,12 @@ function deep_roads.Context:drawy(pos1, direction_axis, distance, rise, tunnel_d
 				current_location.y = current_location.y + y_dir
 			end
 		end
-		if not vector.equals(current_location, pos2) then
-			minetest.debug("Not equal drawy results! current location, predicted location: " .. minetest.pos_to_string(current_location) .. " " .. minetest.pos_to_string(pos2))
-		end
+--		if not vector.equals(current_location, pos2) then
+--			minetest.debug("Not equal drawy results! current location, predicted location: " .. minetest.pos_to_string(current_location) .. " " .. minetest.pos_to_string(pos2))
+--		end
 	end
 
+	--minetest.debug("returning " .. minetest.pos_to_string(pos2))
 	return pos2
 end
 
@@ -780,7 +781,7 @@ function deep_roads.Context:draw_tunnel_segment(source, destination, tunnel_def,
 	end
 	
 	if not change_y then
-		local dist = math.min(math.random(10, 1000), math.abs(diff[change_axis])-1) * dir[change_axis]
+		local dist = math.min(math.random(10, 1000), math.abs(diff[change_axis])) * dir[change_axis]
 		next_location = self:drawxz(next_location, change_axis, dist, tunnel_def)
 		if distance_within(destination, next_location, tunnel_diameter+1) then return end
 		self:drawcorner(next_location, tunnel_def, nil)
