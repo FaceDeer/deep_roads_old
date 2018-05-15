@@ -24,7 +24,7 @@ local function setting(stype, name, default, description)
 end
 
 setting("int", "gridscale_xz", 500, "X/Z grid scale")
-setting("int", "gridscale_y", 500, "Y grid scale")
+setting("int", "gridscale_y", 200, "Y grid scale")
 
 setting("int", "y_min", -2300, "Y minimum")
 setting("int", "y_max", -10, "Y maximum")
