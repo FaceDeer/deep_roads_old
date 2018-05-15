@@ -3,6 +3,7 @@ deep_roads = {} --create a container for functions and constants
 --grab a shorthand for the filepath of the mod
 local modpath = minetest.get_modpath(minetest.get_current_modname())
 
+dofile(modpath.."/voxelarea_iterator.lua")
 dofile(modpath.."/functions.lua") --function definitions
 dofile(modpath.."/config.lua")
 
