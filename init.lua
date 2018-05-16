@@ -47,10 +47,11 @@ local tunnel_def =
 	
 	bridge_support_block = c_fence,
 	bridge_support_spacing = 3,
-	--bridge_width = 3,
+	bridge_width = 1,
 	
-	--wall_block = c_stonebrick,
-	--ceiling_block = c_stonebrick,
+	wall_block = c_stonebrick,
+	ceiling_block = c_stonebrick,
+	floor_block = c_stonebrick,
 	
 	stair_block = c_stonebrickstair,
 	
@@ -63,11 +64,16 @@ local tunnel_def =
 	stair_length = 14,
 	
 }
-local narrow_tunnel = 
+local narrow_def = 
 {
 	width=0,
 	height=2,
 	bridge_block = c_wood,
+	stair_block = c_stonebrickstair,
+	torch_spacing = 16,
+	torch_height = 1,
+	bridge_support_block = c_fence,
+	bridge_support_spacing = 6,
 }
 local sewer_def =
 {
@@ -113,7 +119,7 @@ minetest.register_on_generated(function(minp, maxp, seed)
 	vm:get_data(data)
 	vm:get_param2_data(data_param2)
 
-	local context = deep_roads.Context:new(minp, maxp, area, data, data_param2, gridscale, ymin, ymax, intersection_def, tunnel_def, connection_probability)
+	local context = deep_roads.Context:new(minp, maxp, area, data, data_param2, gridscale, ymin, ymax, intersection_def, narrow_def, connection_probability)
 	
 	for _, pt in ipairs(context.points) do
 		--minetest.debug(minetest.pos_to_string(pt) .. " named " .. deep_roads.random_name(pt.val))

@@ -341,13 +341,13 @@ function deep_roads.Context:place_torch(intersectmin, intersectmax, axis, interm
 	end
 end
 
-function deep_roads.Context:draw_torches(path1, path2, width_axis, length_axis, tunnel_def)
+function deep_roads.Context:draw_torches(path1, path2, width_axis, length_axis, tunnel_def, boost_height)
 	local torch1 = vector.new(path1)
 	local torch2 = vector.new(path2)
 	local area = self.area
 	if tunnel_def.torch_arrangement == "1 wall" or tunnel_def.torch_arrangement == "2 wall pairs" then
-		torch1.y = torch1.y + tunnel_def.torch_height
-		torch2.y = torch2.y + tunnel_def.torch_height
+		torch1.y = torch1.y + tunnel_def.torch_height + boost_height
+		torch2.y = torch2.y + tunnel_def.torch_height + boost_height
 		torch1[width_axis] = torch1[width_axis] + tunnel_def.width
 		torch2[width_axis] = torch2[width_axis] + tunnel_def.width
 		intersectmin, intersectmax = intersect(torch1, torch2, self.chunk_min, self.chunk_max)
@@ -512,10 +512,18 @@ end
 
 -- from_dir leaves the wall on that side open
 --TODO: all the detail work (wall material, trench material - no need for rail, liquid, torches, etc)
-function deep_roads.Context:drawcorner(pos, tunnel_def, from_dir)
-	local corner1 = vector.new(pos.x - tunnel_def.width, pos.y, pos.z - tunnel_def.width)
-	local corner2 = vector.new(pos.x + tunnel_def.width, pos.y + tunnel_def.height - 1, pos.z + tunnel_def.width)
-		
+function deep_roads.Context:drawcorner(pos, tunnel_def)
+	local displace = tunnel_def.width
+
+	local corner1 = vector.new(pos.x - displace, pos.y, pos.z - displace)
+	local corner2 = vector.new(pos.x + displace, pos.y + tunnel_def.height - 1, pos.z + displace)
+	
+	local overall1 = vector.add(vector.new(corner1), -1)
+	local overall2 = vector.add(vector.new(corner2), 1)
+	
+	intersectmin, intersectmax = intersect(overall1, overall2, self.chunk_min, self.chunk_max)
+	if intersectmin == nil then return end
+	
 	intersectmin, intersectmax = intersect(corner1, corner2, self.chunk_min, self.chunk_max)
 	local locked_indices = self.locked_indices
 	local data = self.data
@@ -525,9 +533,56 @@ function deep_roads.Context:drawcorner(pos, tunnel_def, from_dir)
 			if not locked_indices[pi] then
 				data[pi] = c_air
 			end
-		end		
+		end
+		
+		-- TODO: trenches
 	end
-end
+	
+	local wall_block = tunnel_def.wall_block
+	local floor_block = tunnel_def.floor_block
+	local ceiling_block = tunnel_def.ceiling_block
+	local bridge_block = tunnel_def.bridge_block
+	local seal_air_block = tunnel_def.seal_air_block
+	local seal_water_block = tunnel_def.seal_water_block
+	local seal_lava_block = tunnel_def.seal_lava_block
+
+	--walls, floor, ceiling modifications
+	if floor_block or seal_lava_block or seal_water_block then
+		self:modify_slab(vector.new(pos.x - displace, pos.y - 1, pos.z - displace),
+			vector.new(pos.x + displace, pos.y + 1, pos.z + displace),
+			tunnel_def, floor_block, nil, seal_water_block, seal_lava_block)
+	end
+
+	if tunnel_def.bridge_block then
+		local bridge_width = tunnel_def.bridge_width
+		self:modify_slab(vector.new(pos.x - bridge_width, pos.y -1, pos.z - bridge_width),
+			vector.new(pos.x + bridge_width, pos.y -1, pos.z + bridge_width),
+			tunnel_def, nil, bridge_block, seal_water_block, seal_lava_block)
+	end
+
+	if ceiling_block or seal_lava_block or seal_water_block or seal_air_block then
+		self:modify_slab(vector.new(pos.x - displace, pos.y + tunnel_def.height, pos.z - displace),
+			vector.new(pos.x + displace, pos.y + tunnel_def.height, pos.z + displace),
+			tunnel_def, ceiling_block, seal_air_block, seal_water_block, seal_lava_block)
+	end
+	
+	if wall_block or seal_lava_block or seal_water_block or seal_air_block then
+		local wall_displace = displace + 1
+	
+		self:modify_slab(vector.new(pos.x - wall_displace, pos.y, pos.z + wall_displace),
+			vector.new(pos.x + wall_displace, pos.y + tunnel_def.height, pos.z + wall_displace),
+			tunnel_def, wall_block, seal_air_block, seal_water_block, seal_lava_block)
+		self:modify_slab(vector.new(pos.x - wall_displace, pos.y, pos.z - wall_displace),
+			vector.new(pos.x + wall_displace, pos.y + tunnel_def.height, pos.z - wall_displace),
+			tunnel_def, wall_block, seal_air_block, seal_water_block, seal_lava_block)
+		self:modify_slab(vector.new(pos.x + wall_displace, pos.y, pos.z - wall_displace),
+			vector.new(pos.x + wall_displace, pos.y + tunnel_def.height, pos.z + wall_displace),
+			tunnel_def, wall_block, seal_air_block, seal_water_block, seal_lava_block)
+		self:modify_slab(vector.new(pos.x - wall_displace, pos.y, pos.z - wall_displace),
+			vector.new(pos.x - wall_displace, pos.y + tunnel_def.height, pos.z + wall_displace),
+			tunnel_def, wall_block, seal_air_block, seal_water_block, seal_lava_block)
+	end	
+end 
 
 -- Draws a horizontal tunnel starting from pos1 and extending distance nodes in the given direction axis.
 -- Return the position vector one node *beyond* the dug out area, such that repeated calls would not overlap.
@@ -544,8 +599,13 @@ function deep_roads.Context:drawxz(pos1, length_axis, distance, tunnel_def, rise
 	
 	local displace = tunnel_def.width
 	local height = tunnel_def.height
+	local boost_torch_height = 0
 	if rise_dir ~= nil then
 		height = height + 1
+		if height < 4 and tunnel_def.stair_block ~= nil then
+			height = height + 1 -- need some extra head space when there are stairs and a low ceiling
+			boost_torch_height = 1
+		end
 	end
 
 	local tunnel1 = {x = math.min(pos1.x, pos2.x), y = pos1.y, z = math.min(pos1.z, pos2.z)}
@@ -598,7 +658,7 @@ function deep_roads.Context:drawxz(pos1, length_axis, distance, tunnel_def, rise
 			end
 			
 			if tunnel_def.torch_spacing then
-				self:draw_torches(path1, path2, width_axis, length_axis, tunnel_def)
+				self:draw_torches(path1, path2, width_axis, length_axis, tunnel_def, boost_torch_height)
 			end
 			
 			if tunnel_def.trench_block and displace > 0 then
@@ -630,6 +690,7 @@ function deep_roads.Context:drawxz(pos1, length_axis, distance, tunnel_def, rise
 	
 			self:modify_slab(floor1, floor2, tunnel_def, floor_block, nil, seal_water_material, seal_lava_material)
 		end
+		
 		if ceiling_block or seal_lava_material or seal_water_material or seal_air_material then
 			local ceiling1 = vector.new(path1.x, path1.y+height, path1.z)
 			local ceiling2 = vector.new(path2.x, path2.y+height, path2.z)
@@ -790,11 +851,11 @@ function deep_roads.Context:draw_tunnel_segment(source, destination, tunnel_def,
 		if change_axis == "x" and ((prev_dir.x < 0 and dir.x > 0) or (prev_dir.x > 0 and dir.x < 0)) then
 			next_location = self:drawxz(next_location, "z", distance, tunnel_def)
 			if distance_within(destination, next_location, tunnel_diameter+1) then return end
-			self:drawcorner(next_location, tunnel_def, nil)
+			self:drawcorner(next_location, tunnel_def)
 		elseif change_axis == "z" and ((prev_dir.z < 0 and dir.z > 0) or (prev_dir.z > 0 and dir.z < 0)) then
 			next_location = self:drawxz(next_location, "x", distance, tunnel_def)
 			if distance_within(destination, next_location, tunnel_diameter+1) then return end
-			self:drawcorner(next_location, tunnel_def, nil)
+			self:drawcorner(next_location, tunnel_def)
 		end
 	end
 	
@@ -802,7 +863,7 @@ function deep_roads.Context:draw_tunnel_segment(source, destination, tunnel_def,
 		local dist = math.min(math.random(10, 1000), math.abs(diff[change_axis])) * dir[change_axis]
 		next_location = self:drawxz(next_location, change_axis, dist, tunnel_def)
 		if distance_within(destination, next_location, tunnel_diameter+1) then return end
-		self:drawcorner(next_location, tunnel_def, nil)
+		self:drawcorner(next_location, tunnel_def)
 	else
 		-- if we're changing direction first go width nodes in this direction to make the corner nicer.
 		local aglet_distance = (width+1)*dir[change_axis]
@@ -814,7 +875,7 @@ function deep_roads.Context:draw_tunnel_segment(source, destination, tunnel_def,
 		-- then the last bit to make the bottom nicer
 		next_location = self:drawxz(next_location, change_axis, aglet_distance, tunnel_def)
 		if distance_within(destination, next_location, tunnel_diameter+1) then return end
-		self:drawcorner(next_location, tunnel_def, nil)
+		self:drawcorner(next_location, tunnel_def)
 
 	end
 	prev_dir = vector.subtract(next_location, source)
