@@ -71,9 +71,11 @@ local set_defaults = function(defaults, target)
 	end
 end
 
-function deep_roads.Context:new(minp, maxp, area, data, data_param2, gridscale, ymin, ymax, intersection_def, connection_def, connection_probability)
+function deep_roads.Context:new(minp, maxp, area, data, data_param2, network_def)
 
-	set_defaults(default_tunnel_def, connection_def)
+--gridscale, ymin, ymax, intersection_def, connection_def, connection_probability)
+	
+	set_defaults(default_tunnel_def, network_def.tunnels)
 
 	local context = {}
 	setmetatable(context, self)
@@ -84,14 +86,13 @@ function deep_roads.Context:new(minp, maxp, area, data, data_param2, gridscale, 
 	context.area = area
 	context.chunk_min = minp
 	context.chunk_max = maxp
-	context.gridscale = gridscale
-	context.ymin = ymin
-	context.ymax = ymax
+	context.gridscale = network_def.gridscale
+	context.ymin = network_def.ymin
+	context.ymax = network_def.ymax
 	context.seed = tonumber(minetest.get_mapgen_setting("seed"))
 	
-	context:road_points_around(1,4, intersection_def)
-	context:find_connections(connection_probability, connection_def)
-
+	context:road_points_around(network_def.intersections)
+	context:find_connections(network_def.connection_probability, network_def.tunnels)
 	
 	return context
 end
@@ -164,7 +165,9 @@ function deep_roads.Context:scatter_3d(min_xyz, min_output_size, max_output_size
 end
 
 
-function deep_roads.Context:road_points_around(min_output_size, max_output_size, intersection_def)
+function deep_roads.Context:road_points_around(intersection_def)
+	local min_output_size = intersection_def.min_count
+	local max_output_size = intersection_def.max_count
 	local pos = self.chunk_min
 	local gridscale_xyz = self.gridscale
 	local min_y = self.ymin
@@ -860,7 +863,7 @@ function deep_roads.Context:draw_tunnel_segment(source, destination, tunnel_def,
 	end
 	
 	if not change_y then
-		local dist = math.min(math.random(10, 1000), math.abs(diff[change_axis])) * dir[change_axis]
+		local dist = math.min(math.random(10, self.gridscale.x), math.abs(diff[change_axis])) * dir[change_axis]
 		next_location = self:drawxz(next_location, change_axis, dist, tunnel_def)
 		if distance_within(destination, next_location, tunnel_diameter+1) then return end
 		self:drawcorner(next_location, tunnel_def)
@@ -870,7 +873,7 @@ function deep_roads.Context:draw_tunnel_segment(source, destination, tunnel_def,
 		next_location = self:drawxz(next_location, change_axis, aglet_distance, tunnel_def)
 		if distance_within(destination, next_location, tunnel_diameter+1) then return end
 		-- then do the sloped part
-		local dist = math.min(math.random(10, 1000), math.abs(diff.y)) * dir[change_axis]
+		local dist = math.min(math.random(10, self.gridscale.y), math.abs(diff.y)) * dir[change_axis]
 		next_location = self:drawy(next_location, change_axis, dist, math.abs(dist)*dir.y, tunnel_def)
 		-- then the last bit to make the bottom nicer
 		next_location = self:drawxz(next_location, change_axis, aglet_distance, tunnel_def)
