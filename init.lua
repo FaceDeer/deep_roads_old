@@ -56,10 +56,10 @@ deep_roads.register_network = function(network_def)
 	-- On generated function
 	minetest.register_on_generated(function(minp, maxp, seed)
 	
-		--if out of range of cave definition limits, abort
-	--	if minp.y > ymax or maxp.y < ymin then
-	--		return
-	--	end
+		--if out of range of network definition limits, abort
+		if minp.y > network_def.ymax or maxp.y < network_def.ymin then
+			return
+		end
 		
 		--easy reference to commonly used values
 		local t_start = os.clock()
