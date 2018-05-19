@@ -4,6 +4,7 @@ deep_roads = {} --create a container for functions and constants
 local modpath = minetest.get_modpath(minetest.get_current_modname())
 
 dofile(modpath.."/voxelarea_iterator.lua")
+dofile(modpath.."/name_generators.lua")
 dofile(modpath.."/functions.lua") --function definitions
 dofile(modpath.."/config.lua")
 
@@ -137,6 +138,7 @@ local network_pedestrian_spaghetti =
 	ymax = 0,
 	ymin = -400,
 	connection_probability = 0.75,
+	name_generator = deep_roads.random_string,
 }
 
 local network_long_rails =
@@ -175,6 +177,7 @@ local network_long_rails =
 	ymax = -20,
 	ymin = -2300,
 	connection_probability = 0.75,
+	name_generator = deep_roads.random_name,
 }
 
 deep_roads.register_network(network_pedestrian_spaghetti)

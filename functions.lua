@@ -8,18 +8,6 @@ local c_torch_wall = minetest.get_content_id("default:torch_wall")
 local c_wood_sign = minetest.get_content_id("default:sign_wall_wood")
 local c_mese_post = minetest.get_content_id("default:mese_post_light")
 
-local nameparts_filename = "language.txt"
-
-local nameparts = {}
-local file = io.open(minetest.get_modpath(minetest.get_current_modname()).."/" .. nameparts_filename, "r")
-if file then
-	for line in file:lines() do
-		table.insert(nameparts, line)
-	end
-else
-	nameparts = {"Unable to read " .. nameparts_filename}
-end
-
 -- these get used a lot, predefine them and save on stack allocations
 local intersectmin, intersectmax
 
@@ -90,6 +78,7 @@ function deep_roads.Context:new(minp, maxp, area, data, data_param2, network_def
 	context.ymin = network_def.ymin
 	context.ymax = network_def.ymax
 	context.seed = tonumber(minetest.get_mapgen_setting("seed"))
+	context.name_generator = network_def.name_generator
 	
 	context:road_points_around(network_def.intersections)
 	context:find_connections(network_def.connection_probability, network_def.tunnels)
@@ -104,12 +93,6 @@ end
 
 local random_sign = function()
 	if math.random() > 0.5 then return 1 else return -1 end
-end
-
-deep_roads.random_name = function(rand)
-	local prefix = math.floor(rand * 2^16) % table.getn(nameparts) + 1
-	local suffix = math.floor(rand * 2^32) % table.getn(nameparts) + 1
-	return (nameparts[prefix] .. nameparts[suffix]):gsub("^%l", string.upper)
 end
 
 local distance_within = function(pos1, pos2, distance)
@@ -888,8 +871,8 @@ end
 function deep_roads.Context:segmentize_connection(connection)
 	math.randomseed(connection.val*1000000000)
 
-	self:place_sign_on_ceiling(connection.pt1, "To " .. deep_roads.random_name(connection.pt2.val), 3)
-	self:place_sign_on_ceiling(connection.pt2, "To " .. deep_roads.random_name(connection.pt1.val), 3)
+	self:place_sign_on_ceiling(connection.pt1, "To " .. self.name_generator(connection.pt2.val), 3)
+	self:place_sign_on_ceiling(connection.pt2, "To " .. self.name_generator(connection.pt1.val), 3)
 	
 	self:draw_tunnel_segment(connection.pt1, connection.pt2, connection.def, nil)
 end
@@ -989,6 +972,6 @@ function deep_roads.Context:carve_intersection(point)
 		for pi in area:iterp(intersectmin, intersectmax) do
 			data[pi] = c_air
 		end
-		self:place_sign_on_post(point, "Welcome to " .. deep_roads.random_name(point.val))
+		self:place_sign_on_post(point, "Welcome to " .. self.name_generator(point.val))
 	end
 end
